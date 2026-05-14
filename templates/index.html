@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spirit AI – Certificate Mailer</title>
+  <style>
+    :root {
+      --primary: #1a3a5c;
+      --accent:  #1abc9c;
+      --bg:      #eef2f7;
+      --card:    #ffffff;
+      --muted:   #6c757d;
+      --danger:  #e74c3c;
+      --success: #27ae60;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: var(--bg); color: #222; }
+
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    header .logo { font-size: 1.5rem; font-weight: bold; letter-spacing: 1px; }
+    header .sub  { font-size: 0.8rem; opacity: 0.65; margin-top: 2px; }
+    header .badge {
+      margin-left: auto;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: bold;
+    }
+
+    .container { max-width: 860px; margin: 36px auto; padding: 0 20px 60px; }
+
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 28px 32px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    }
+    .card h2 {
+      font-size: 0.95rem;
+      color: var(--primary);
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Upload zones */
+    .upload-zone {
+      border: 2px dashed #bcd;
+      border-radius: 10px;
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag {
+      border-color: var(--accent);
+      background: #f0faf8;
+    }
+    .upload-zone input[type=file] {
+      position: absolute; inset: 0; opacity: 0;
+      cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-zone .icon  { font-size: 2.2rem; }
+    .upload-zone p      { margin-top: 8px; color: var(--muted); font-size: 0.88rem; }
+    .upload-zone .fname { margin-top: 8px; font-weight: bold; color: var(--primary); font-size: 0.88rem; word-break: break-all; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    label { display: block; font-size: 0.83rem; font-weight: bold; color: var(--primary); margin-bottom: 6px; }
+    input[type=text], input[type=url], input[type=email], input[type=number] {
+      width: 100%; padding: 10px 14px;
+      border: 1px solid #ccd; border-radius: 7px;
+      font-size: 0.92rem; outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: var(--accent); }
+    .hint { font-size: 0.76rem; color: var(--muted); margin-top: 4px; }
+
+    /* Preview section */
+    .preview-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .preview-row > div { flex: 1; min-width: 160px; }
+    .btn-preview {
+      padding: 10px 20px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.88rem;
+      font-weight: bold;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-preview:hover { opacity: 0.88; }
+    #preview-img-wrap {
+      display: none;
+      margin-top: 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    #preview-img-wrap img { width: 100%; display: block; }
+
+    /* Send button */
+    .btn-send {
+      width: 100%;
+      padding: 17px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+      letter-spacing: 0.4px;
+    }
+    .btn-send:hover    { background: #0f2840; }
+    .btn-send:disabled { background: #999; cursor: not-allowed; }
+
+    /* Progress */
+    #progress-section { display: none; margin-top: 24px; }
+    .stats { display: flex; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+    .stat-box {
+      flex: 1; min-width: 100px;
+      border-radius: 10px; padding: 18px 12px;
+      text-align: center;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.08);
+    }
+    .stat-box.total  { background: #e8f0fc; }
+    .stat-box.sent   { background: #eafaf1; }
+    .stat-box.failed { background: #fdf2f2; }
+    .stat-box .num   { font-size: 2.4rem; font-weight: bold; line-height: 1; }
+    .stat-box.total  .num { color: var(--primary); }
+    .stat-box.sent   .num { color: var(--success); }
+    .stat-box.failed .num { color: var(--danger); }
+    .stat-box .lbl   { font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
+
+    .bar-wrap { background: #e0e0e0; border-radius: 999px; height: 14px; overflow: hidden; margin-bottom: 6px; }
+    .bar-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.4s ease; width: 0%; }
+    .bar-pct  { font-size: 0.82rem; color: var(--muted); text-align: right; }
+
+    .status-msg { font-size: 0.88rem; color: var(--muted); margin-bottom: 14px; }
+
+    .done-banner {
+      display: none;
+      background: #eafaf1; border: 1px solid #a9dfbf;
+      border-radius: 8px; padding: 14px 20px;
+      color: #1e8449; font-weight: bold; font-size: 1rem;
+      margin-top: 14px;
+    }
+
+    #error-log { display: none; margin-top: 16px; }
+    #error-log h3 { color: #c0392b; font-size: 0.88rem; margin-bottom: 8px; }
+    #error-list {
+      background: #fdf2f2; border: 1px solid #f5c6cb;
+      border-radius: 6px; padding: 12px 16px;
+      max-height: 220px; overflow-y: auto;
+      font-size: 0.8rem; color: #721c24; font-family: monospace;
+      list-style: none;
+    }
+    #error-list li { margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid #f5c6cb; }
+    #error-list li:last-child { border-bottom: none; }
+
+    .excel-hint {
+      background: #fffbea;
+      border: 1px solid #f0d060;
+      border-radius: 7px;
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      color: #7d6608;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">&#127807; SPIRIT AI SOLUTIONS</div>
+    <div class="sub">DRIVEN BY SPIRIT. DEFINED BY INTELLIGENCE.</div>
+  </div>
+  <div class="badge">Certificate Mailer</div>
+</header>
+
+<div class="container">
+
+  <!-- Step 1: Excel -->
+  <div class="card">
+    <h2>&#128203; Step 1 &mdash; Student List (Excel)</h2>
+    <div class="upload-zone" id="zone-excel">
+      <input type="file" id="excel-input" accept=".xlsx,.xls" />
+      <div class="icon">&#128202;</div>
+      <p>Click or drag &amp; drop Excel file here</p>
+      <div class="fname" id="excel-name">No file selected</div>
+    </div>
+    <div class="excel-hint">
+      &#9432; Excel must have exactly two columns: &nbsp;<strong>name</strong>&nbsp; and &nbsp;<strong>email</strong><br>
+      Example: &nbsp; <code>name</code> &rarr; Rahul Kumar &nbsp;|&nbsp; <code>email</code> &rarr; rahul@gmail.com
+    </div>
+  </div>
+
+  <!-- Step 2: Certificate -->
+  <div class="card">
+    <h2>&#127891; Step 2 &mdash; Certificate Template (PNG / JPG)</h2>
+    <div class="upload-zone" id="zone-cert">
+      <input type="file" id="cert-input" accept=".png,.jpg,.jpeg" />
+      <div class="icon">&#128444;&#65039;</div>
+      <p>Click or drag &amp; drop certificate image here</p>
+      <div class="fname" id="cert-name">No file selected</div>
+    </div>
+
+    <!-- Preview controls -->
+    <div class="preview-row">
+      <div>
+        <label for="y-pct">Name Y Position (% from top)</label>
+        <input type="number" id="y-pct" value="36" min="1" max="99" step="0.5" style="width:110px;" />
+        <p class="hint">Default 44%. Adjust if name too high/low.</p>
+      </div>
+      <div>
+        <label for="preview-name">Preview with name</label>
+        <input type="text" id="preview-name" placeholder="e.g. Rahul Kumar" />
+      </div>
+      <div style="padding-bottom:22px;">
+        <button class="btn-preview" onclick="previewCert()">&#128065; Preview Certificate</button>
+      </div>
+    </div>
+    <div id="preview-img-wrap">
+      <img id="preview-img" src="" alt="Certificate Preview" />
+    </div>
+  </div>
+
+  <!-- Step 3: Config -->
+  <div class="card">
+    <h2>&#9881;&#65039; Step 3 &mdash; Email Settings</h2>
+    <div class="grid-2">
+      <div>
+        <label for="reg-link">Registration Link *</label>
+        <input type="url" id="reg-link" placeholder="https://..." />
+        <p class="hint">Replaces <code>[Insert Link]</code> in body</p>
+      </div>
+      <div>
+        <label for="cc-email">CC Email (optional)</label>
+        <input type="email" id="cc-email" placeholder="team@spiritaisolutions.com" />
+        <p class="hint">CC'd on every student email</p>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <label for="body-template">Email Body *</label>
+      <p class="hint" style="margin-bottom:8px;">
+        Use <code>[Student]</code> for student name &nbsp;|&nbsp; <code>[Insert Link]</code> for registration link &nbsp;|&nbsp; <code>*text*</code> for <strong>bold</strong>
+      </p>
+      <textarea id="body-template" rows="18"
+        style="width:100%;padding:12px 14px;border:1px solid #ccd;border-radius:7px;font-family:Arial,sans-serif;font-size:0.88rem;line-height:1.7;resize:vertical;outline:none;"
+        onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='#ccd'"
+      >Dear [Student],
+
+Greetings from SPIRIT AI SOLUTIONS PVT LTD,
+
+Thank you for attending our workshop.
+
+Please find your *Participation Certificate* attached.
+
+We invite you to join our *45-Day AI Program (Online)*.
+
+*Program Highlights:*
+
+5 Intermediate + 2 Advanced Modules
+1 Capstone Project + 5 Mini Projects
+Special Focus on *Agentic AI*
+Certifications & Placement Assistance
+
+*Course Fee:* ₹6000
+*Early Offer:* ₹1000 discount for early registration
+
+Top-performing candidates will get *internship opportunities* after course completion.
+
+👉 Register here: [Insert Link]
+
+Looking forward to seeing you in the program!
+
+Best regards,
+SPIRIT AI SOLUTIONS PVT LTD
++91 63055 31544
++91 63038 52583
+sales@spiritaisolutions.com
+https://spiritaisolutions.com/</textarea>
+    </div>
+  </div>
+
+  <!-- Send -->
+  <button class="btn-send" id="send-btn" onclick="startSend()">
+    &#128640; Send Certificates to All Students
+  </button>
+
+  <!-- Progress section -->
+  <div class="card" id="progress-section">
+    <h2>&#128228; Sending Progress</h2>
+    <p class="status-msg" id="status-msg">Connecting to mail server...</p>
+
+    <div class="stats">
+      <div class="stat-box total">
+        <div class="num" id="stat-total">0</div>
+        <div class="lbl">Total Students</div>
+      </div>
+      <div class="stat-box sent">
+        <div class="num" id="stat-sent">0</div>
+        <div class="lbl">&#10003; Sent</div>
+      </div>
+      <div class="stat-box failed">
+        <div class="num" id="stat-failed">0</div>
+        <div class="lbl">&#10007; Failed</div>
+      </div>
+    </div>
+
+    <div class="bar-wrap">
+      <div class="bar-fill" id="bar-fill"></div>
+    </div>
+    <div class="bar-pct" id="bar-pct">0%</div>
+
+    <div class="done-banner" id="done-banner">
+      &#10003; All done! Check counts above for results.
+    </div>
+
+    <a id="report-btn" href="#" target="_blank"
+       style="display:none;margin-top:14px;padding:12px 22px;background:#1a3a5c;color:#fff;
+              font-weight:bold;font-size:0.95rem;border-radius:8px;text-decoration:none;
+              display:none;align-items:center;gap:8px;">
+      &#128196; Download Report (Excel)
+    </a>
+
+    <div id="error-log">
+      <h3>&#9888; Failed Emails</h3>
+      <ul id="error-list"></ul>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  // ── File tracking (handles both click-select and drag-drop) ─────────────
+  const files = { excel: null, cert: null };
+
+  function setupZone(inputId, nameId, zoneId, key) {
+    const input  = document.getElementById(inputId);
+    const nameEl = document.getElementById(nameId);
+    const zone   = document.getElementById(zoneId);
+
+    function setFile(f) {
+      if (!f) return;
+      files[key] = f;
+      nameEl.textContent = f.name;
+    }
+
+    input.addEventListener('change', () => setFile(input.files[0]));
+
+    zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag');
+      setFile(e.dataTransfer.files[0]);
+    });
+  }
+
+  setupZone('excel-input', 'excel-name', 'zone-excel', 'excel');
+  setupZone('cert-input',  'cert-name',  'zone-cert',  'cert');
+
+  // ── Certificate Preview ─────────────────────────────────────────────────
+  async function previewCert() {
+    if (!files.cert) { alert('Upload certificate template first.'); return; }
+    const name = document.getElementById('preview-name').value.trim() || 'Student Name';
+    const yPct = document.getElementById('y-pct').value;
+
+    const fd = new FormData();
+    fd.append('certificate', files.cert);
+    fd.append('name', name);
+    fd.append('y_pct', yPct);
+
+    const btn = document.querySelector('.btn-preview');
+    btn.textContent = 'Loading...';
+    btn.disabled = true;
+
+    try {
+      const res  = await fetch('/preview', { method: 'POST', body: fd });
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      document.getElementById('preview-img').src = url;
+      document.getElementById('preview-img-wrap').style.display = 'block';
+    } catch (e) {
+      alert('Preview failed: ' + e.message);
+    } finally {
+      btn.textContent = '👁 Preview Certificate';
+      btn.disabled = false;
+    }
+  }
+
+  // ── Send ────────────────────────────────────────────────────────────────
+  let pollTimer = null;
+
+  async function startSend() {
+    if (!files.excel)   { alert('Please upload the student Excel file.'); return; }
+    if (!files.cert)    { alert('Please upload the certificate template.'); return; }
+
+    const regLink      = document.getElementById('reg-link').value.trim();
+    const ccEmail      = document.getElementById('cc-email').value.trim();
+    const yPct         = document.getElementById('y-pct').value;
+    const bodyTemplate = document.getElementById('body-template').value.trim();
+
+    if (!regLink)      { alert('Please enter the registration link.'); return; }
+    if (!bodyTemplate) { alert('Email body cannot be empty.'); return; }
+
+    // Reset UI
+    document.getElementById('stat-sent').textContent   = '0';
+    document.getElementById('stat-failed').textContent = '0';
+    document.getElementById('bar-fill').style.width    = '0%';
+    document.getElementById('bar-pct').textContent     = '0%';
+    document.getElementById('done-banner').style.display = 'none';
+    document.getElementById('report-btn').style.display  = 'none';
+    document.getElementById('error-log').style.display  = 'none';
+    document.getElementById('error-list').innerHTML     = '';
+    document.getElementById('progress-section').style.display = 'block';
+    document.getElementById('status-msg').textContent = 'Uploading and connecting to mail server...';
+    document.getElementById('progress-section').scrollIntoView({ behavior: 'smooth' });
+
+    const btn = document.getElementById('send-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Sending...';
+
+    const fd = new FormData();
+    fd.append('excel',         files.excel);
+    fd.append('certificate',   files.cert);
+    fd.append('reg_link',      regLink);
+    fd.append('cc_email',      ccEmail);
+    fd.append('y_pct',         yPct);
+    fd.append('body_template', bodyTemplate);
+
+    try {
+      const res  = await fetch('/send', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (data.error) {
+        alert('Error: ' + data.error);
+        btn.disabled = false;
+        btn.textContent = '🚀 Send Certificates to All Students';
+        return;
+      }
+
+      document.getElementById('stat-total').textContent = data.total;
+      pollStatus(data.job_id, data.total);
+
+    } catch (e) {
+      alert('Network error: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '🚀 Send Certificates to All Students';
+    }
+  }
+
+  function pollStatus(jobId, total) {
+    if (pollTimer) clearInterval(pollTimer);
+
+    pollTimer = setInterval(async () => {
+      try {
+        const res  = await fetch(`/status/${jobId}`);
+        const data = await res.json();
+
+        if (data.error) { clearInterval(pollTimer); return; }
+
+        const sent      = data.sent   || 0;
+        const failed    = data.failed || 0;
+        const processed = sent + failed;
+        const pct       = total > 0 ? Math.round((processed / total) * 100) : 0;
+
+        document.getElementById('stat-sent').textContent   = sent;
+        document.getElementById('stat-failed').textContent = failed;
+        document.getElementById('bar-fill').style.width    = pct + '%';
+        document.getElementById('bar-pct').textContent     = pct + '%';
+        document.getElementById('status-msg').textContent  =
+          data.done ? 'Completed.' : `Sending… ${processed} of ${total}`;
+
+        if (data.errors && data.errors.length > 0) {
+          document.getElementById('error-log').style.display = 'block';
+          document.getElementById('error-list').innerHTML =
+            data.errors.map(e => `<li>${e}</li>`).join('');
+        }
+
+        if (data.done) {
+          clearInterval(pollTimer);
+          document.getElementById('done-banner').style.display = 'block';
+
+          const reportBtn = document.getElementById('report-btn');
+          reportBtn.href = `/report/${jobId}`;
+          reportBtn.style.display = 'inline-flex';
+
+          const btn = document.getElementById('send-btn');
+          btn.disabled = false;
+          btn.textContent = '🚀 Send Certificates to All Students';
+        }
+
+      } catch (e) { console.error('Poll error:', e); }
+    }, 1000);
+  }
+</script>
+
+</body>
+</html>
