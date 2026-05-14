@@ -3,145 +3,357 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Spirit AI – Mailer</title>
+  <title>NexZen – Mailer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;700&display=swap" rel="stylesheet"/>
   <style>
-    :root{--p:#1a3a5c;--a:#1abc9c;--bg:#eef2f7;--card:#fff;--mu:#6c757d;--err:#e74c3c;--ok:#27ae60;}
+    :root{
+      --p:#111111;
+      --a:#3080ff;
+      --bg:#f5f5f5;
+      --card:#ffffff;
+      --border:#eeeeee;
+      --text:#0f172a;
+      --mu:#62748e;
+      --err:#fb2c36;
+      --ok:#00a544;
+      --dark:#0f172a;
+    }
     *{box-sizing:border-box;margin:0;padding:0;}
-    body{font-family:Arial,sans-serif;background:var(--bg);color:#222;}
+    body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:15px;}
 
-    header{background:var(--p);color:#fff;padding:18px 32px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 6px rgba(0,0,0,.2);}
-    .logo{font-size:1.5rem;font-weight:bold;letter-spacing:1px;}
-    .sub{font-size:.8rem;opacity:.65;margin-top:2px;}
-    .hbadge{margin-left:auto;background:var(--a);color:#fff;font-size:.75rem;padding:4px 10px;border-radius:20px;font-weight:bold;}
+    /* Header */
+    header{
+      background:#fff;
+      border-bottom:1px solid var(--border);
+      padding:0 40px;
+      height:64px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      position:sticky;
+      top:0;
+      z-index:100;
+      box-shadow:0 1px 3px rgba(0,0,0,.06);
+    }
+    .logo-wrap{display:flex;align-items:center;}
+    .hbadge{
+      background:var(--dark);color:#fff;font-size:.72rem;padding:4px 12px;
+      border-radius:999px;font-weight:600;letter-spacing:.3px;font-family:'Manrope',sans-serif;
+    }
 
-    .container{max-width:880px;margin:32px auto;padding:0 20px 80px;}
+    /* Container */
+    .container{max-width:900px;margin:36px auto;padding:0 20px 100px;}
 
-    .card{background:var(--card);border-radius:12px;padding:28px 32px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,.07);}
-    .card h2{font-size:.95rem;color:var(--p);margin-bottom:18px;padding-bottom:10px;border-bottom:2px solid var(--a);display:flex;align-items:center;gap:8px;}
-    .opt-badge{font-size:.68rem;background:#e8f0fc;color:var(--p);padding:2px 8px;border-radius:10px;font-weight:normal;margin-left:4px;}
+    /* Cards */
+    .card{
+      background:var(--card);border:1px solid var(--border);
+      border-radius:12px;padding:28px 32px;margin-bottom:18px;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    .card:hover{border-color:#ccc;box-shadow:0 4px 20px rgba(0,0,0,.05);}
+    .card-head{
+      display:flex;align-items:center;gap:10px;
+      margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);
+    }
+    .step-num{
+      width:26px;height:26px;border-radius:50%;background:var(--dark);color:#fff;
+      font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;
+    }
+    .card-head h2{font-size:.93rem;font-weight:600;color:var(--dark);}
+    .opt-badge{
+      font-size:.65rem;background:#f0f0f0;color:var(--mu);
+      padding:2px 8px;border-radius:6px;font-weight:500;margin-left:4px;
+    }
 
     /* Upload zones */
-    .upload-zone{border:2px dashed #bcd;border-radius:10px;padding:26px 20px;text-align:center;cursor:pointer;transition:.2s;position:relative;}
-    .upload-zone:hover,.upload-zone.drag{border-color:var(--a);background:#f0faf8;}
+    .upload-zone{
+      border:1.5px dashed #d1d5dc;border-radius:10px;padding:28px 20px;
+      text-align:center;cursor:pointer;transition:.2s;position:relative;
+      background:#fafafa;
+    }
+    .upload-zone:hover,.upload-zone.drag{border-color:var(--a);background:#eff6ff;}
     .upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
-    .upload-zone .icon{font-size:2rem;}
-    .upload-zone p{margin-top:6px;color:var(--mu);font-size:.85rem;}
-    .fname{margin-top:6px;font-weight:bold;color:var(--p);font-size:.85rem;word-break:break-all;}
+    .upload-zone .icon{font-size:1.8rem;margin-bottom:6px;}
+    .upload-zone p{color:var(--mu);font-size:.83rem;}
+    .fname{margin-top:7px;font-weight:600;color:var(--dark);font-size:.82rem;word-break:break-all;}
 
     /* Column chips */
-    #col-section{display:none;margin-top:18px;padding-top:16px;border-top:1px solid #eee;}
-    .col-label{font-size:.8rem;color:var(--mu);margin-bottom:8px;}
+    #col-section{display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}
+    .col-label{font-size:.78rem;color:var(--mu);margin-bottom:8px;}
     .chips{display:flex;flex-wrap:wrap;gap:7px;}
-    .chip{padding:5px 13px;border-radius:20px;font-size:.79rem;font-weight:bold;transition:.15s;user-select:none;}
-    .chip-req{background:#fdf2f2;color:#721c24;border:1px solid #f5c6cb;cursor:default;}
-    .chip-col{background:#e8f0fc;color:var(--p);border:1px solid #b8d0e8;cursor:pointer;}
+    .chip{padding:4px 12px;border-radius:6px;font-size:.76rem;font-weight:600;transition:.15s;user-select:none;}
+    .chip-req{background:#f0f0f0;color:var(--mu);border:1px solid #e5e7eb;cursor:default;}
+    .chip-col{background:#eff6ff;color:var(--a);border:1px solid #bedbff;cursor:pointer;}
     .chip-col:hover{background:var(--a);color:#fff;border-color:var(--a);}
-    .sample-box{background:#f4f7fb;border-radius:7px;padding:9px 13px;margin-top:10px;font-size:.78rem;color:var(--mu);}
-    .sample-box strong{color:var(--p);}
-    .hint-box{background:#fffbea;border:1px solid #f0d060;border-radius:7px;padding:9px 13px;font-size:.78rem;color:#7d6608;margin-top:10px;}
+    .sample-box{
+      background:#fafafa;border:1px solid var(--border);border-radius:8px;
+      padding:9px 13px;margin-top:10px;font-size:.77rem;color:var(--mu);
+    }
+    .sample-box strong{color:var(--dark);}
+    .hint-box{
+      background:#eff6ff;border:1px solid #bedbff;border-radius:8px;
+      padding:9px 13px;font-size:.77rem;color:#1447e6;margin-top:10px;
+    }
+
+    /* Form fields */
+    label{display:block;font-size:.79rem;font-weight:600;color:var(--dark);margin-bottom:5px;}
+    input[type=text],input[type=url],input[type=email],input[type=number],input[type=password]{
+      width:100%;padding:10px 14px;border:1px solid #d1d5dc;border-radius:8px;
+      font-size:.88rem;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s,box-shadow .2s;
+      background:#fff;color:var(--dark);
+    }
+    input:focus{border-color:var(--a);box-shadow:0 0 0 3px rgba(48,128,255,.12);}
+    .pass-wrap{position:relative;}
+    .pass-wrap input{padding-right:44px;}
+    .pass-toggle{
+      position:absolute;right:12px;top:50%;transform:translateY(-50%);
+      background:none;border:none;cursor:pointer;color:var(--mu);font-size:.85rem;padding:2px;
+    }
+    .hint{font-size:.73rem;color:var(--mu);margin-top:4px;}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+    .grid-3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;}
+    @media(max-width:600px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+    /* Select */
+    select{
+      padding:10px 14px;border:1px solid #d1d5dc;border-radius:8px;
+      font-size:.88rem;font-family:'Inter',sans-serif;outline:none;
+      color:var(--dark);background:#fff;cursor:pointer;
+    }
+    select:focus{border-color:var(--a);box-shadow:0 0 0 3px rgba(48,128,255,.12);}
+    select.attach-sel{width:100%;max-width:320px;font-weight:600;margin-bottom:16px;}
 
     /* Attachment */
-    select.attach-sel{width:100%;max-width:320px;padding:10px 14px;border:1px solid #ccd;border-radius:7px;font-size:.92rem;color:var(--p);font-weight:bold;margin-bottom:16px;outline:none;cursor:pointer;}
-    .attach-block{display:none;padding-top:14px;border-top:1px dashed #dde;}
+    .attach-block{display:none;padding-top:14px;border-top:1px dashed #e5e7eb;}
     .attach-block.show{display:block;}
     .name-col-row{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}
-    .name-col-row label{font-size:.8rem;font-weight:bold;color:var(--p);white-space:nowrap;margin-bottom:0;}
-    .name-col-row select{padding:7px 12px;border:1px solid #ccd;border-radius:6px;font-size:.86rem;outline:none;color:var(--p);}
+    .name-col-row label{margin-bottom:0;white-space:nowrap;}
     .preview-row{display:flex;gap:12px;align-items:flex-end;margin-top:14px;flex-wrap:wrap;}
     .preview-row>div{flex:1;min-width:140px;}
-    .btn-cert-prev{padding:10px 16px;background:var(--a);color:#fff;border:none;border-radius:7px;font-size:.84rem;font-weight:bold;cursor:pointer;white-space:nowrap;}
-    .btn-cert-prev:hover{opacity:.88;}
-    #cert-prev-wrap{display:none;margin-top:14px;border:1px solid #ddd;border-radius:8px;overflow:hidden;}
+    #cert-prev-wrap{display:none;margin-top:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
     #cert-prev-wrap img{width:100%;display:block;}
     .docs-list{margin-top:10px;display:flex;flex-direction:column;gap:6px;}
-    .doc-item{display:flex;align-items:center;justify-content:space-between;background:#f4f7fb;border-radius:6px;padding:7px 12px;font-size:.81rem;}
+    .doc-item{
+      display:flex;align-items:center;justify-content:space-between;
+      background:#fafafa;border:1px solid var(--border);border-radius:7px;
+      padding:7px 12px;font-size:.8rem;
+    }
     .doc-item button{background:none;border:none;color:var(--err);cursor:pointer;font-size:1rem;line-height:1;}
 
-    /* Form */
-    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
-    @media(max-width:600px){.grid-2{grid-template-columns:1fr;}}
-    label{display:block;font-size:.81rem;font-weight:bold;color:var(--p);margin-bottom:5px;}
-    input[type=text],input[type=url],input[type=email],input[type=number]{
-      width:100%;padding:10px 14px;border:1px solid #ccd;border-radius:7px;font-size:.9rem;outline:none;transition:border-color .2s;
+    /* Body textarea */
+    #placeholder-hint{
+      display:none;background:#eff6ff;border:1px solid #bedbff;border-radius:8px;
+      padding:9px 13px;font-size:.76rem;color:#1447e6;margin-bottom:10px;
     }
-    input:focus{border-color:var(--a);}
-    .hint{font-size:.74rem;color:var(--mu);margin-top:4px;}
-    #placeholder-hint{display:none;background:#f0faf8;border:1px solid #b2dfdb;border-radius:7px;padding:9px 13px;font-size:.78rem;color:#1a5246;margin-bottom:10px;}
-    #placeholder-hint code{background:#d0f0ec;padding:1px 5px;border-radius:3px;font-size:.76rem;}
-    textarea#body-tpl{width:100%;padding:12px 14px;border:1px solid #ccd;border-radius:7px;font-family:Arial,sans-serif;font-size:.86rem;line-height:1.7;resize:vertical;outline:none;}
-    textarea#body-tpl:focus{border-color:var(--a);}
+    #placeholder-hint code{background:#bedbff55;padding:1px 5px;border-radius:3px;}
+    textarea#body-tpl{
+      width:100%;padding:12px 14px;border:1px solid #d1d5dc;border-radius:8px;
+      font-family:'Inter',sans-serif;font-size:.85rem;line-height:1.75;resize:vertical;outline:none;
+      color:var(--dark);
+    }
+    textarea#body-tpl:focus{border-color:var(--a);box-shadow:0 0 0 3px rgba(48,128,255,.12);}
 
     /* Buttons */
-    .btn-full{width:100%;padding:15px;font-size:1rem;font-weight:bold;border:none;border-radius:10px;cursor:pointer;transition:.2s;}
-    .btn-prev-email{background:var(--a);color:#fff;margin-bottom:0;}
-    .btn-prev-email:hover{opacity:.88;}
-    .btn-prev-email:disabled{background:#999;cursor:not-allowed;}
+    .btn{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:11px 24px;border:none;border-radius:8px;
+      font-family:'Inter',sans-serif;font-size:.88rem;font-weight:600;
+      cursor:pointer;transition:all .2s;text-decoration:none;
+    }
+    .btn-primary{background:var(--p);color:#fff;}
+    .btn-primary:hover{background:#000;transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.18);}
+    .btn-primary:disabled{background:#999;cursor:not-allowed;transform:none;box-shadow:none;}
+    .btn-outline{background:transparent;color:var(--p);border:1px solid #ccc;}
+    .btn-outline:hover{border-color:var(--p);transform:translateY(-1px);}
+    .btn-full{width:100%;justify-content:center;padding:14px 24px;font-size:.95rem;}
+    .btn-cert-prev{background:var(--a);color:#fff;}
+    .btn-cert-prev:hover{background:#1447e6;transform:translateY(-1px);}
+
+    /* SMTP warning */
+    .smtp-info{
+      background:#fafafa;border:1px solid var(--border);border-radius:8px;
+      padding:9px 14px;font-size:.76rem;color:var(--mu);margin-top:14px;
+      display:flex;align-items:flex-start;gap:6px;
+    }
 
     /* Progress */
-    #progress-section{display:none;margin-top:20px;}
+    #progress-section{display:none;margin-top:18px;}
     .stats{display:flex;gap:14px;margin-bottom:16px;flex-wrap:wrap;}
-    .sbox{flex:1;min-width:90px;border-radius:10px;padding:15px 10px;text-align:center;box-shadow:0 1px 5px rgba(0,0,0,.08);}
-    .sbox.tot{background:#e8f0fc;}.sbox.snt{background:#eafaf1;}.sbox.fld{background:#fdf2f2;}
-    .sbox .num{font-size:2.2rem;font-weight:bold;line-height:1;}
-    .sbox.tot .num{color:var(--p);}.sbox.snt .num{color:var(--ok);}.sbox.fld .num{color:var(--err);}
-    .sbox .lbl{font-size:.76rem;color:var(--mu);margin-top:5px;}
-    .bar-wrap{background:#e0e0e0;border-radius:999px;height:13px;overflow:hidden;margin-bottom:5px;}
-    .bar-fill{height:100%;background:var(--a);border-radius:999px;transition:width .4s;width:0%;}
-    .bar-pct{font-size:.78rem;color:var(--mu);text-align:right;margin-bottom:12px;}
-    .smsg{font-size:.85rem;color:var(--mu);margin-bottom:12px;}
-    .done-banner{display:none;background:#eafaf1;border:1px solid #a9dfbf;border-radius:8px;padding:12px 18px;color:#1e8449;font-weight:bold;font-size:.92rem;margin-top:12px;}
-    #report-btn{display:none;margin-top:12px;padding:10px 20px;background:var(--p);color:#fff;font-weight:bold;font-size:.88rem;border-radius:8px;text-decoration:none;display:none;}
+    .sbox{
+      flex:1;min-width:90px;border-radius:10px;padding:16px 10px;
+      text-align:center;border:1px solid var(--border);background:#fff;
+    }
+    .sbox.tot{border-left:3px solid var(--dark);}
+    .sbox.snt{border-left:3px solid var(--ok);}
+    .sbox.fld{border-left:3px solid var(--err);}
+    .sbox .num{font-size:2.2rem;font-weight:700;font-family:'Manrope',sans-serif;line-height:1;}
+    .sbox.tot .num{color:var(--dark);}
+    .sbox.snt .num{color:var(--ok);}
+    .sbox.fld .num{color:var(--err);}
+    .sbox .lbl{font-size:.73rem;color:var(--mu);margin-top:5px;}
+    .bar-wrap{background:#e5e7eb;border-radius:999px;height:8px;overflow:hidden;margin-bottom:5px;}
+    .bar-fill{height:100%;background:var(--dark);border-radius:999px;transition:width .4s;width:0%;}
+    .bar-pct{font-size:.75rem;color:var(--mu);text-align:right;margin-bottom:12px;}
+    .smsg{font-size:.83rem;color:var(--mu);margin-bottom:12px;}
+    .done-banner{
+      display:none;background:#f0fdf4;border:1px solid #b9f8cf;border-radius:8px;
+      padding:12px 18px;color:#008138;font-weight:600;font-size:.88rem;margin-top:12px;
+    }
+    #report-btn{display:none;}
     #error-log{display:none;margin-top:14px;}
-    #error-log h3{color:#c0392b;font-size:.84rem;margin-bottom:7px;}
-    #error-list{background:#fdf2f2;border:1px solid #f5c6cb;border-radius:6px;padding:10px 14px;max-height:200px;overflow-y:auto;font-size:.77rem;color:#721c24;font-family:monospace;list-style:none;}
-    #error-list li{margin-bottom:3px;padding-bottom:3px;border-bottom:1px solid #f5c6cb;}
+    #error-log h3{color:var(--err);font-size:.82rem;margin-bottom:7px;font-weight:600;}
+    #error-list{
+      background:#fef2f2;border:1px solid #ffcaca;border-radius:7px;
+      padding:10px 14px;max-height:200px;overflow-y:auto;
+      font-size:.75rem;color:#e40014;font-family:monospace;list-style:none;
+    }
+    #error-list li{margin-bottom:3px;padding-bottom:3px;border-bottom:1px solid #ffcaca;}
     #error-list li:last-child{border-bottom:none;}
 
     /* Modal */
-    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;padding:20px;}
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;padding:20px;}
     .modal-overlay.open{display:flex;}
-    .modal-box{background:#fff;border-radius:14px;width:100%;max-width:820px;max-height:92vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,.28);}
-    .modal-hd{background:var(--p);color:#fff;padding:18px 24px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;}
-    .modal-hd h3{font-size:.96rem;}
-    .modal-hd button{background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer;line-height:1;opacity:.8;}
+    .modal-box{background:#fff;border-radius:14px;width:100%;max-width:820px;max-height:92vh;overflow-y:auto;box-shadow:0 25px 50px rgba(0,0,0,.2);}
+    .modal-hd{
+      background:var(--dark);color:#fff;padding:18px 24px;
+      border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;
+    }
+    .modal-hd h3{font-size:.9rem;font-weight:600;}
+    .modal-hd button{background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;opacity:.7;line-height:1;}
     .modal-hd button:hover{opacity:1;}
     .modal-bd{padding:20px 24px;}
-    .modal-sub{font-size:.8rem;color:var(--mu);margin-bottom:12px;}
-    #prev-frame{width:100%;height:420px;border:1px solid #ddd;border-radius:8px;}
-    #prev-cert-img{display:none;width:100%;border-radius:8px;margin-top:14px;border:1px solid #ddd;}
-    .modal-ft{padding:14px 24px;border-top:1px solid #eee;display:flex;gap:12px;justify-content:flex-end;}
-    .btn-edit{padding:10px 22px;background:#eee;color:var(--p);border:none;border-radius:7px;font-weight:bold;cursor:pointer;font-size:.86rem;}
-    .btn-edit:hover{background:#ddd;}
-    .btn-csend{padding:10px 24px;background:var(--p);color:#fff;border:none;border-radius:7px;font-weight:bold;cursor:pointer;font-size:.86rem;}
-    .btn-csend:hover{background:#0f2840;}
+    .modal-sub{font-size:.78rem;color:var(--mu);margin-bottom:12px;}
+    #prev-frame{width:100%;height:420px;border:1px solid var(--border);border-radius:8px;}
+    #prev-cert-img{display:none;width:100%;border-radius:8px;margin-top:14px;border:1px solid var(--border);}
+    .modal-ft{padding:14px 24px;border-top:1px solid var(--border);display:flex;gap:12px;justify-content:flex-end;}
+    .btn-edit{padding:10px 22px;background:#f0f0f0;color:var(--dark);border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.85rem;font-family:'Inter',sans-serif;}
+    .btn-edit:hover{background:#e5e7eb;}
+    .btn-csend{padding:10px 24px;background:var(--p);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.85rem;font-family:'Inter',sans-serif;}
+    .btn-csend:hover{background:#000;}
     .btn-csend:disabled{background:#999;cursor:not-allowed;}
 
-    hr.sec{border:none;border-top:1px dashed #dde;margin:16px 0;}
+    hr.sec{border:none;border-top:1px dashed #e5e7eb;margin:16px 0;}
+
+    /* Plan selector */
+    .plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px;}
+    @media(max-width:560px){.plan-grid{grid-template-columns:1fr;}}
+    .plan-card{
+      border:2px solid var(--border);border-radius:10px;padding:16px 18px;
+      cursor:pointer;transition:all .18s;position:relative;
+    }
+    .plan-card:hover{border-color:#aaa;}
+    .plan-card.selected{border-color:var(--dark);background:#fafafa;}
+    .plan-card input[type=radio]{position:absolute;opacity:0;pointer-events:none;}
+    .plan-title{font-weight:700;font-size:.92rem;color:var(--dark);margin-bottom:4px;display:flex;align-items:center;gap:7px;}
+    .plan-badge{font-size:.65rem;padding:2px 8px;border-radius:5px;font-weight:600;}
+    .badge-basic{background:#f0f0f0;color:#555;}
+    .badge-pro{background:#0f172a;color:#fff;}
+    .plan-desc{font-size:.77rem;color:var(--mu);line-height:1.5;}
+    .plan-delay{font-size:.75rem;font-weight:600;margin-top:7px;}
+    .plan-delay.slow{color:#a36100;}
+    .plan-delay.fast{color:var(--ok);}
+    .eta-bar{
+      background:#eff6ff;border:1px solid #bedbff;border-radius:8px;
+      padding:10px 14px;margin-top:14px;font-size:.79rem;color:#1447e6;
+      display:none;
+    }
+    .eta-bar strong{font-size:.9rem;}
   </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <div class="logo">&#127807; SPIRIT AI SOLUTIONS</div>
-    <div class="sub">DRIVEN BY SPIRIT. DEFINED BY INTELLIGENCE.</div>
+  <div class="logo-wrap" style="gap:10px;">
+    <img src="/static/logo.png" alt="NexZen icon" style="height:32px;display:block;"/>
+    <span style="font-family:'Manrope',sans-serif;font-weight:700;font-size:1.15rem;color:#0f172a;letter-spacing:1px;">NEXZEN</span>
   </div>
   <div class="hbadge">Mailer</div>
 </header>
 
 <div class="container">
 
+  <!-- ── SMTP CONFIG ──────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-num">⚙</div>
+      <h2>Sender Configuration</h2>
+    </div>
+    <div class="grid-2" style="margin-bottom:14px;">
+      <div>
+        <label for="smtp-user">From Email *</label>
+        <input type="email" id="smtp-user" placeholder="you@yourdomain.com"/>
+      </div>
+      <div>
+        <label for="smtp-pass">Email Password *</label>
+        <div class="pass-wrap">
+          <input type="password" id="smtp-pass" placeholder="Your email password"/>
+          <button class="pass-toggle" onclick="togglePass()" type="button" title="Show/hide password">👁</button>
+        </div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div>
+        <label for="smtp-server">SMTP Server</label>
+        <input type="text" id="smtp-server" value="smtp.hostinger.com"/>
+        <p class="hint">Hostinger: smtp.hostinger.com &nbsp;|&nbsp; Gmail: smtp.gmail.com</p>
+      </div>
+      <div>
+        <label for="smtp-port">SMTP Port</label>
+        <input type="number" id="smtp-port" value="465"/>
+        <p class="hint">SSL: 465 &nbsp;|&nbsp; TLS: 587</p>
+      </div>
+    </div>
+    <div class="smtp-info">
+      <span>🔒</span>
+      <span>Credentials are used only for this session and never stored. Run on HTTPS in production.</span>
+    </div>
+  </div>
+
+  <!-- ── SEND PLAN ────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-num">⚡</div>
+      <h2>Send Plan</h2>
+    </div>
+    <p style="font-size:.8rem;color:var(--mu);margin-bottom:14px;">
+      SMTP servers limit how fast you can send. Sending too fast risks getting your domain flagged as spam or temporarily blocked. Choose a plan that matches your hosting.
+    </p>
+    <div class="plan-grid">
+      <label class="plan-card selected" id="plan-basic-card">
+        <input type="radio" name="send-plan" id="plan-basic" value="3" checked onchange="onPlanChange(this)"/>
+        <div class="plan-title">Basic <span class="plan-badge badge-basic">Shared Hosting</span></div>
+        <div class="plan-desc">3 second delay between each email. Safe for Hostinger shared, cPanel, standard SMTP. Recommended if you're unsure.</div>
+        <div class="plan-delay slow">⏱ ~20 emails / minute</div>
+      </label>
+      <label class="plan-card" id="plan-pro-card">
+        <input type="radio" name="send-plan" id="plan-pro" value="0.5" onchange="onPlanChange(this)"/>
+        <div class="plan-title">Pro <span class="plan-badge badge-pro">Business / Dedicated</span></div>
+        <div class="plan-desc">0.5 second delay. For Hostinger Business, SendGrid, Mailgun or dedicated SMTP with high rate limits.</div>
+        <div class="plan-delay fast">⚡ ~120 emails / minute</div>
+      </label>
+    </div>
+    <div class="eta-bar" id="eta-bar">
+      Estimated time to send <strong id="eta-total">0</strong> emails on this plan: <strong id="eta-time">—</strong>
+    </div>
+  </div>
+
   <!-- ── STEP 1 ────────────────────────────────────────────── -->
   <div class="card">
-    <h2>&#128203; Step 1 &mdash; Student List (Excel)</h2>
+    <div class="card-head">
+      <div class="step-num">1</div>
+      <h2>Student / Contact List (Excel)</h2>
+    </div>
     <div class="upload-zone" id="zone-excel">
       <input type="file" id="excel-input" accept=".xlsx,.xls"/>
-      <div class="icon">&#128202;</div>
+      <div class="icon">📊</div>
       <p>Click or drag &amp; drop Excel file here</p>
       <div class="fname" id="excel-name">No file selected</div>
     </div>
     <div class="hint-box">
-      &#9432; <strong>email</strong> column is mandatory. Other columns become placeholders you can use in the email body.
+      ℹ <strong>email</strong> column is mandatory. All other columns become <code>[placeholders]</code> in the email body.
     </div>
 
     <div id="col-section">
@@ -153,9 +365,12 @@
 
   <!-- ── STEP 2 ────────────────────────────────────────────── -->
   <div class="card">
-    <h2>&#128206; Step 2 &mdash; Attachments <span class="opt-badge">Optional</span></h2>
+    <div class="card-head">
+      <div class="step-num">2</div>
+      <h2>Attachments <span class="opt-badge">Optional</span></h2>
+    </div>
 
-    <label for="attach-type" style="margin-bottom:8px;">What do you want to attach?</label>
+    <label for="attach-type" style="margin-bottom:8px;">What to attach?</label>
     <select class="attach-sel" id="attach-type" onchange="onAttachChange(this.value)">
       <option value="none">None — no attachments</option>
       <option value="certificate">Certificate only</option>
@@ -168,7 +383,7 @@
       <label>Certificate Template (PNG / JPG)</label>
       <div class="upload-zone" id="zone-cert">
         <input type="file" id="cert-input" accept=".png,.jpg,.jpeg"/>
-        <div class="icon">&#127891;</div>
+        <div class="icon">🎓</div>
         <p>Click or drag &amp; drop certificate image here</p>
         <div class="fname" id="cert-name">No file selected</div>
       </div>
@@ -191,7 +406,7 @@
           <input type="text" id="prev-name" placeholder="e.g. Rahul Kumar"/>
         </div>
         <div style="padding-bottom:22px;">
-          <button class="btn-cert-prev" onclick="previewCert()">&#128065; Preview Certificate</button>
+          <button class="btn btn-cert-prev" onclick="previewCert()">👁 Preview Certificate</button>
         </div>
       </div>
       <div id="cert-prev-wrap"><img id="cert-prev-img" src="" alt="Certificate Preview"/></div>
@@ -203,9 +418,9 @@
       <label>Documents to Attach</label>
       <div class="upload-zone" id="zone-docs">
         <input type="file" id="docs-input" multiple/>
-        <div class="icon">&#128196;</div>
-        <p>Click or drag files here &mdash; PDF, Word, images, etc.</p>
-        <p style="font-size:.74rem;color:var(--mu);margin-top:3px;">Multiple files supported</p>
+        <div class="icon">📄</div>
+        <p>Click or drag files here — PDF, Word, images, etc.</p>
+        <p style="font-size:.73rem;color:var(--mu);margin-top:3px;">Multiple files supported</p>
       </div>
       <div class="docs-list" id="docs-list"></div>
     </div>
@@ -213,23 +428,26 @@
 
   <!-- ── STEP 3 ────────────────────────────────────────────── -->
   <div class="card">
-    <h2>&#9993; Step 3 &mdash; Email</h2>
+    <div class="card-head">
+      <div class="step-num">3</div>
+      <h2>Email</h2>
+    </div>
 
     <div style="margin-bottom:16px;">
-      <label for="subject">Subject Line</label>
-      <input type="text" id="subject" value="Your Participation Certificate – Spirit AI Solutions Workshop"/>
+      <label for="subject">Subject Line *</label>
+      <input type="text" id="subject" placeholder="Your Participation Certificate – NexZen Workshop"/>
     </div>
 
     <div class="grid-2" style="margin-bottom:16px;">
       <div>
-        <label for="reg-link">Registration Link <span style="font-weight:normal;color:var(--mu);">(optional)</span></label>
+        <label for="reg-link">Registration Link <span style="font-weight:400;color:var(--mu);">(optional)</span></label>
         <input type="url" id="reg-link" placeholder="https://..."/>
-        <p class="hint">Use <code>[Insert Link]</code> in body to insert this</p>
+        <p class="hint">Use <code>[Insert Link]</code> in body to place this</p>
       </div>
       <div>
-        <label for="cc-email">CC Email <span style="font-weight:normal;color:var(--mu);">(optional)</span></label>
-        <input type="email" id="cc-email" placeholder="team@spiritaisolutions.com"/>
-        <p class="hint">CC'd on every student email</p>
+        <label for="cc-email">CC Email <span style="font-weight:400;color:var(--mu);">(optional)</span></label>
+        <input type="email" id="cc-email" placeholder="team@nexzen.me"/>
+        <p class="hint">CC'd on every email. Multiple: comma-separated</p>
       </div>
     </div>
 
@@ -238,71 +456,41 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px;">
       <label for="body-tpl" style="margin-bottom:0;">Email Body *</label>
       <div style="display:flex;align-items:center;gap:8px;">
-        <label style="margin-bottom:0;font-weight:normal;font-size:.8rem;color:var(--mu);">Body Type:</label>
+        <label style="margin-bottom:0;font-weight:400;font-size:.78rem;color:var(--mu);">Body Type:</label>
         <select id="body-type" onchange="onBodyTypeChange(this.value)"
-          style="padding:5px 10px;border:1px solid #ccd;border-radius:6px;font-size:.84rem;color:var(--p);outline:none;cursor:pointer;">
+          style="padding:6px 10px;font-size:.82rem;">
           <option value="plain">Plain Text</option>
           <option value="html">HTML</option>
         </select>
       </div>
     </div>
     <p class="hint" id="body-type-hint" style="margin-bottom:8px;">Use <code>*text*</code> for bold. Double blank line = new paragraph.</p>
-    <textarea id="body-tpl" rows="17">Dear [name],
-
-Greetings from SPIRIT AI SOLUTIONS PVT LTD,
-
-Thank you for attending our workshop.
-
-Please find your *Participation Certificate* attached.
-
-We invite you to join our *45-Day AI Program (Online)*.
-
-*Program Highlights:*
-
-5 Intermediate + 2 Advanced Modules
-1 Capstone Project + 5 Mini Projects
-Special Focus on *Agentic AI*
-Certifications & Placement Assistance
-
-*Course Fee:* ₹6000
-*Early Offer:* ₹1000 discount for early registration
-
-Top-performing candidates will get *internship opportunities* after course completion.
-
-👉 Register here: [Insert Link]
-
-Looking forward to seeing you in the program!
-
-Best regards,
-SPIRIT AI SOLUTIONS PVT LTD
-+91 63055 31544
-+91 63038 52583
-sales@spiritaisolutions.com
-https://spiritaisolutions.com/</textarea>
+    <textarea id="body-tpl" rows="17" placeholder="Write your email body here. Use [column_name] placeholders from your Excel file."></textarea>
   </div>
 
   <!-- ── Preview button ────────────────────────────────────── -->
-  <button class="btn-full btn-prev-email" id="prev-email-btn" onclick="showEmailPreview()">
-    &#128065; Preview Email Before Sending
+  <button class="btn btn-primary btn-full" id="prev-email-btn" onclick="showEmailPreview()">
+    👁 Preview Email Before Sending
   </button>
 
   <!-- ── Progress ──────────────────────────────────────────── -->
   <div class="card" id="progress-section">
-    <h2>&#128228; Sending Progress</h2>
+    <div class="card-head"><div class="step-num">📨</div><h2>Sending Progress</h2></div>
     <p class="smsg" id="smsg">Connecting to mail server...</p>
     <div class="stats">
       <div class="sbox tot"><div class="num" id="s-tot">0</div><div class="lbl">Total</div></div>
-      <div class="sbox snt"><div class="num" id="s-snt">0</div><div class="lbl">&#10003; Sent</div></div>
-      <div class="sbox fld"><div class="num" id="s-fld">0</div><div class="lbl">&#10007; Failed</div></div>
+      <div class="sbox snt"><div class="num" id="s-snt">0</div><div class="lbl">✓ Sent</div></div>
+      <div class="sbox fld"><div class="num" id="s-fld">0</div><div class="lbl">✗ Failed</div></div>
     </div>
     <div class="bar-wrap"><div class="bar-fill" id="bar-fill"></div></div>
     <div class="bar-pct" id="bar-pct">0%</div>
-    <div class="done-banner" id="done-banner">&#10003; All done!</div>
-    <a id="report-btn" href="#" target="_blank" style="display:none;margin-top:12px;padding:10px 20px;background:var(--p);color:#fff;font-weight:bold;font-size:.88rem;border-radius:8px;text-decoration:none;display:none;">
-      &#128196; Download Report (Excel)
+    <div class="done-banner" id="done-banner">✓ All done!</div>
+    <a id="report-btn" href="#" target="_blank"
+       style="display:none;margin-top:12px;padding:10px 20px;background:var(--dark);color:#fff;font-weight:600;font-size:.85rem;border-radius:8px;text-decoration:none;display:none;font-family:'Inter',sans-serif;">
+      📄 Download Report (Excel)
     </a>
     <div id="error-log">
-      <h3>&#9888; Failed Emails</h3>
+      <h3>⚠ Failed Emails</h3>
       <ul id="error-list"></ul>
     </div>
   </div>
@@ -313,8 +501,8 @@ https://spiritaisolutions.com/</textarea>
 <div class="modal-overlay" id="prev-modal">
   <div class="modal-box">
     <div class="modal-hd">
-      <h3>&#128065; Email Preview — First Student</h3>
-      <button onclick="closePreview()">&#215;</button>
+      <h3>👁 Email Preview — First Student</h3>
+      <button onclick="closePreview()">×</button>
     </div>
     <div class="modal-bd">
       <p class="modal-sub" id="modal-sub">Loading...</p>
@@ -322,16 +510,15 @@ https://spiritaisolutions.com/</textarea>
       <img id="prev-cert-img" alt="Certificate Preview"/>
     </div>
     <div class="modal-ft">
-      <button class="btn-edit" onclick="closePreview()">&#8592; Edit</button>
+      <button class="btn-edit" onclick="closePreview()">← Edit</button>
       <button class="btn-csend" id="csend-btn" onclick="confirmSend()">
-        &#128640; Send to All &nbsp;<span id="send-count"></span>&nbsp; Students
+        🚀 Send to All &nbsp;<span id="send-count"></span>&nbsp; Students
       </button>
     </div>
   </div>
 </div>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────
 const S = {
   excelFile: null,
   certFile:  null,
@@ -340,10 +527,32 @@ const S = {
   sample:    {},
   total:     0,
   attachType:'none',
-  pollTimer: null
+  pollTimer: null,
+  delay:     3
 };
 
-// ── Zone setup ─────────────────────────────────────────────────────────────
+function onPlanChange(radio) {
+  S.delay = parseFloat(radio.value);
+  document.getElementById('plan-basic-card').classList.toggle('selected', radio.id === 'plan-basic');
+  document.getElementById('plan-pro-card').classList.toggle('selected',   radio.id === 'plan-pro');
+  updateEta();
+}
+
+function updateEta() {
+  if (!S.total) return;
+  const secs = Math.round(S.total * S.delay);
+  const mins = Math.floor(secs / 60), rem = secs % 60;
+  const timeStr = mins > 0 ? `~${mins}m ${rem}s` : `~${secs}s`;
+  document.getElementById('eta-total').textContent = S.total;
+  document.getElementById('eta-time').textContent  = timeStr;
+  document.getElementById('eta-bar').style.display  = 'block';
+}
+
+function togglePass() {
+  const inp = document.getElementById('smtp-pass');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
 function setupZone(inputId, zoneId, handler, multi = false) {
   const input = document.getElementById(inputId);
   const zone  = document.getElementById(zoneId);
@@ -364,7 +573,6 @@ setupZone('excel-input', 'zone-excel', onExcel);
 setupZone('cert-input',  'zone-cert',  onCert);
 setupZone('docs-input',  'zone-docs',  onDocs, true);
 
-// ── Excel ──────────────────────────────────────────────────────────────────
 async function onExcel(file) {
   S.excelFile = file;
   document.getElementById('excel-name').textContent = file.name;
@@ -377,18 +585,17 @@ async function onExcel(file) {
     if (d.error) { alert('Excel error: ' + d.error); return; }
     S.columns = d.columns; S.sample = d.sample; S.total = d.total;
     renderColumns();
+    updateEta();
   } catch(e) { alert('Parse failed: ' + e.message); }
 }
 
 function renderColumns() {
-  const cols    = S.columns;
+  const cols     = S.columns;
   const nonEmail = cols.filter(c => c !== 'email');
 
-  // Info
   document.getElementById('col-info').textContent =
-    `${S.total} students found. Columns detected — click a column to insert placeholder at cursor:`;
+    `${S.total} records found. Click a column chip to insert placeholder at cursor:`;
 
-  // Chips
   const chipsEl = document.getElementById('chips');
   chipsEl.innerHTML = '';
   cols.forEach(col => {
@@ -405,11 +612,9 @@ function renderColumns() {
     chipsEl.appendChild(chip);
   });
 
-  // Sample
   const parts = cols.slice(0, 6).map(c => `<strong>${c}:</strong> ${S.sample[c] || '—'}`);
-  document.getElementById('sample-box').innerHTML = '&#128065; Sample: ' + parts.join(' &nbsp;|&nbsp; ');
+  document.getElementById('sample-box').innerHTML = '👁 Sample: ' + parts.join(' &nbsp;|&nbsp; ');
 
-  // Name col select (for certificate)
   const sel = document.getElementById('name-col');
   sel.innerHTML = '';
   nonEmail.forEach(col => {
@@ -419,11 +624,10 @@ function renderColumns() {
     sel.appendChild(o);
   });
 
-  // Placeholder hint in Step 3
   const hint    = document.getElementById('placeholder-hint');
   const insLink = '<code>[Insert Link]</code>';
   const codes   = nonEmail.map(c => `<code>[${c}]</code>`).join(' ');
-  hint.innerHTML = `<strong>Available placeholders:</strong> ${codes} ${insLink} &nbsp;|&nbsp; <code>*text*</code> for <strong>bold</strong>`;
+  hint.innerHTML = `<strong>Available placeholders:</strong> ${codes} ${insLink}`;
   hint.style.display = 'block';
 
   document.getElementById('col-section').style.display = 'block';
@@ -437,7 +641,6 @@ function insertAt(text) {
   ta.focus();
 }
 
-// ── Certificate ────────────────────────────────────────────────────────────
 function onCert(file) {
   S.certFile = file;
   document.getElementById('cert-name').textContent = file.name;
@@ -463,7 +666,6 @@ async function previewCert() {
   finally { btn.textContent = '👁 Preview Certificate'; btn.disabled = false; }
 }
 
-// ── Docs ───────────────────────────────────────────────────────────────────
 function onDocs(fileList) {
   fileList.forEach(f => { if (!S.docsFiles.find(d => d.name === f.name)) S.docsFiles.push(f); });
   renderDocs();
@@ -474,12 +676,11 @@ function removeDoc(name) {
 }
 function renderDocs() {
   document.getElementById('docs-list').innerHTML = S.docsFiles.map(f =>
-    `<div class="doc-item"><span>&#128196; ${f.name}</span>
-     <button onclick="removeDoc('${f.name.replace(/'/g,"\\'")}')">&#215;</button></div>`
+    `<div class="doc-item"><span>📄 ${f.name}</span>
+     <button onclick="removeDoc('${f.name.replace(/'/g,"\\'")}')">×</button></div>`
   ).join('');
 }
 
-// ── Body type ──────────────────────────────────────────────────────────────
 function onBodyTypeChange(val) {
   const hint = document.getElementById('body-type-hint');
   if (val === 'html') {
@@ -489,21 +690,28 @@ function onBodyTypeChange(val) {
   }
 }
 
-// ── Attachment type ────────────────────────────────────────────────────────
 function onAttachChange(val) {
   S.attachType = val;
   document.getElementById('cert-block').classList.toggle('show', val==='certificate'||val==='both');
   document.getElementById('docs-block').classList.toggle('show', val==='docs'||val==='both');
 }
 
-// ── Email Preview Modal ────────────────────────────────────────────────────
+function _getSmtp() {
+  return {
+    user:   document.getElementById('smtp-user').value.trim(),
+    pass:   document.getElementById('smtp-pass').value,
+    server: document.getElementById('smtp-server').value.trim(),
+    port:   document.getElementById('smtp-port').value.trim(),
+  };
+}
+
 async function showEmailPreview() {
-  if (!S.excelFile)                         { alert('Upload student Excel file first.'); return; }
-  if (!S.columns.includes('email'))         { alert("Excel must have an 'email' column."); return; }
+  if (!S.excelFile)                                         { alert('Upload student Excel file first.'); return; }
+  if (!S.columns.includes('email'))                         { alert("Excel must have an 'email' column."); return; }
   const body = document.getElementById('body-tpl').value.trim();
-  if (!body)                                { alert('Email body is empty.'); return; }
+  if (!body)                                                { alert('Email body is empty.'); return; }
   if ((S.attachType==='certificate'||S.attachType==='both') && !S.certFile)
-                                            { alert('Upload certificate template in Step 2.'); return; }
+                                                            { alert('Upload certificate template in Step 2.'); return; }
 
   const btn = document.getElementById('prev-email-btn');
   btn.textContent = 'Loading preview...'; btn.disabled = true;
@@ -542,11 +750,16 @@ function closePreview() {
   document.getElementById('prev-modal').classList.remove('open');
 }
 
-// ── Confirm & Send ─────────────────────────────────────────────────────────
 async function confirmSend() {
+  const smtp = _getSmtp();
+  if (!smtp.user || !smtp.pass) {
+    alert('Fill in From Email and Password in Sender Configuration first.');
+    closePreview();
+    return;
+  }
+
   closePreview();
 
-  // Reset progress
   ['s-snt','s-fld'].forEach(id => document.getElementById(id).textContent = '0');
   document.getElementById('s-tot').textContent     = S.total;
   document.getElementById('bar-fill').style.width  = '0%';
@@ -572,6 +785,11 @@ async function confirmSend() {
   fd.append('attach_type',   S.attachType);
   fd.append('body_type',     document.getElementById('body-type').value);
   fd.append('name_col',      document.getElementById('name-col').value || 'name');
+  fd.append('smtp_user',     smtp.user);
+  fd.append('smtp_pass',     smtp.pass);
+  fd.append('smtp_server',   smtp.server);
+  fd.append('smtp_port',     smtp.port);
+  fd.append('delay',         S.delay);
 
   if (S.certFile && (S.attachType==='certificate'||S.attachType==='both'))
     fd.append('certificate', S.certFile);
@@ -586,7 +804,6 @@ async function confirmSend() {
   } catch(e) { alert('Network error: ' + e.message); cBtn.disabled = false; }
 }
 
-// ── Polling ────────────────────────────────────────────────────────────────
 function startPolling(jobId, total) {
   if (S.pollTimer) clearInterval(S.pollTimer);
   S.pollTimer = setInterval(async () => {

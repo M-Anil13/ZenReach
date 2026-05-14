@@ -1,4 +1,4 @@
-# Spirit AI – Mail Marketing Web App
+# NexZen – Mail Marketing Web App
 
 A Flask-based bulk email platform for sending personalized emails with certificates and attachments to students or colleges.
 
@@ -93,6 +93,6 @@ SMTP_PORT   = 465
 
 ## Author
 
-**Spirit AI Solutions Pvt Ltd**  
-+91 63055 31544 | sales@spiritaisolutions.com  
-https://spiritaisolutions.com/
+**NexZen**
+hello@nexzen.me
+https://nexzen.me/

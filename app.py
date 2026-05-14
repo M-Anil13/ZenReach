@@ -7,6 +7,8 @@ import ssl
 import io
 import base64
 import json as _json
+import time
+from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
@@ -15,13 +17,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from email.utils import formatdate
-
-# ─── Hardcoded credentials ────────────────────────────────────────────────────
-EMAIL_USER  = "sales@spiritaisolutions.com"
-EMAIL_PASS  = "Hyndhavi@5172"
-SMTP_SERVER = "smtp.hostinger.com"
-SMTP_PORT   = 465
-# ─────────────────────────────────────────────────────────────────────────────
 
 app  = Flask(__name__)
 jobs = {}
@@ -106,7 +101,8 @@ def _build_html(body_template, student_row, reg_link, body_type='plain'):
 
 def _send_job(job_id, students, template_bytes, docs_list,
               reg_link, cc_email, y_pct, body_template,
-              attach_type, name_col, subject, body_type='plain'):
+              attach_type, name_col, subject, body_type,
+              smtp_user, smtp_pass, smtp_server, smtp_port, delay=3.0):
     state = {
         'sent': 0, 'failed': 0, 'total': len(students),
         'done': False, 'errors': [], 'report': []
@@ -115,19 +111,32 @@ def _send_job(job_id, students, template_bytes, docs_list,
 
     try:
         ctx    = ssl.create_default_context()
-        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=ctx)
-        server.login(EMAIL_USER, EMAIL_PASS)
+        server = smtplib.SMTP_SSL(smtp_server, int(smtp_port), context=ctx)
+        server.login(smtp_user, smtp_pass)
     except Exception as e:
         state['errors'].append(f"SMTP connect failed: {e}")
         state['done'] = True
         return
 
-    # CC: split comma-separated emails from frontend input
     cc_list = [e.strip() for e in cc_email.split(',') if e.strip()] if cc_email else []
+
+    # Pre-generate all certificates in parallel to avoid blocking during send
+    cert_cache = {}
+    if attach_type in ('certificate', 'both') and template_bytes:
+        def _gen_cert(s):
+            name = str(s.get(name_col) or s.get('name') or '').strip()
+            if not name:
+                return name, None
+            buf = stamp_name(template_bytes, name, y_pct)
+            return name, buf.read()
+
+        with ThreadPoolExecutor(max_workers=min(8, len(students))) as ex:
+            for name, data in ex.map(_gen_cert, students):
+                if data:
+                    cert_cache[name] = data
 
     for s in students:
         raw_email    = str(s.get('email', '')).strip()
-        # Email column may contain multiple comma-separated addresses
         to_list      = [e.strip() for e in raw_email.split(',') if e.strip()]
         display_name = str(s.get(name_col) or s.get('name') or raw_email).strip()
 
@@ -139,22 +148,23 @@ def _send_job(job_id, students, template_bytes, docs_list,
 
         try:
             msg            = MIMEMultipart()
-            msg['From']    = EMAIL_USER
+            msg['From']    = smtp_user
             msg['To']      = ', '.join(to_list)
             msg['Cc']      = ', '.join(cc_list)
-            msg['Subject'] = subject or "Mail from Spirit AI Solutions"
+            msg['Subject'] = subject or "Mail from NexZen"
             msg['Date']    = formatdate(localtime=True)
 
             msg.attach(MIMEText(_build_html(body_template, s, reg_link, body_type), 'html'))
 
             if attach_type in ('certificate', 'both') and template_bytes:
-                cert_io   = stamp_name(template_bytes, display_name, y_pct)
-                safe      = ''.join(c if c.isalnum() or c in ' _-' else '_' for c in display_name)
-                part      = MIMEBase('application', 'octet-stream')
-                part.set_payload(cert_io.read())
-                encoders.encode_base64(part)
-                part.add_header('Content-Disposition', f'attachment; filename="Certificate_{safe}.png"')
-                msg.attach(part)
+                cert_data = cert_cache.get(display_name)
+                if cert_data:
+                    safe = ''.join(c if c.isalnum() or c in ' _-' else '_' for c in display_name)
+                    part = MIMEBase('application', 'octet-stream')
+                    part.set_payload(cert_data)
+                    encoders.encode_base64(part)
+                    part.add_header('Content-Disposition', f'attachment; filename="Certificate_{safe}.png"')
+                    msg.attach(part)
 
             if attach_type in ('docs', 'both') and docs_list:
                 for fname, fbytes in docs_list:
@@ -164,9 +174,20 @@ def _send_job(job_id, students, template_bytes, docs_list,
                     part.add_header('Content-Disposition', f'attachment; filename="{fname}"')
                     msg.attach(part)
 
-            server.sendmail(EMAIL_USER, to_list + cc_list, msg.as_string())
+            # Smart retry: if rate-limited (421/452), wait 30s and retry once
+            try:
+                server.sendmail(smtp_user, to_list + cc_list, msg.as_string())
+            except smtplib.SMTPResponseException as smtp_err:
+                if smtp_err.smtp_code in (421, 452):
+                    state['errors'].append(f"Rate limited — waiting 30s then retrying {display_name}...")
+                    time.sleep(30)
+                    server.sendmail(smtp_user, to_list + cc_list, msg.as_string())
+                else:
+                    raise
+
             state['sent'] += 1
             state['report'].append({'Name': display_name, 'Email': ', '.join(to_list), 'Status': 'Sent', 'Reason': ''})
+            time.sleep(delay)
 
         except Exception as e:
             state['failed'] += 1
@@ -246,9 +267,16 @@ def send():
         name_col      = request.form.get('name_col', 'name')
         subject       = request.form.get('subject', '').strip()
         body_type     = request.form.get('body_type', 'plain')
+        smtp_user     = request.form.get('smtp_user', '').strip()
+        smtp_pass     = request.form.get('smtp_pass', '')
+        smtp_server   = request.form.get('smtp_server', 'smtp.hostinger.com').strip()
+        smtp_port     = request.form.get('smtp_port', '465').strip()
+        delay         = float(request.form.get('delay', 3.0))
 
         if not body_template:
             return jsonify({'error': 'Email body is empty.'}), 400
+        if not smtp_user or not smtp_pass:
+            return jsonify({'error': 'Sender email and password are required.'}), 400
 
         df = pd.read_excel(excel_file)
         df.columns = df.columns.str.strip().str.lower()
@@ -277,7 +305,8 @@ def send():
             target=_send_job,
             args=(job_id, students, template_bytes, docs_list,
                   reg_link, cc_email, y_pct, body_template,
-                  attach_type, name_col, subject, body_type),
+                  attach_type, name_col, subject, body_type,
+                  smtp_user, smtp_pass, smtp_server, smtp_port, delay),
             daemon=True
         ).start()
 
@@ -320,7 +349,7 @@ def report(job_id):
 
 if __name__ == '__main__':
     print('=' * 50)
-    print('  Spirit AI Mailer')
+    print('  NexZen Mailer')
     print('  Open http://localhost:5000 in browser')
     print('=' * 50)
     app.run(debug=False, port=5000)
