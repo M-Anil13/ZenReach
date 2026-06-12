@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ZenReach by NexZen — WhatsApp &amp; Email outreach</title>
+<link rel="icon" type="image/png" href="/static/logo.png" />
+<link rel="apple-touch-icon" href="/static/logo.png" />
+<style>
+  :root{
+    --bg:#070A12; --panel:#0D1220; --panel2:#111729; --line:#1C2438;
+    --text:#EAF0FA; --dim:#8A96AD; --accent:#4F7CFF; --accent2:#22D3EE;
+    --green:#34D399; --grad:linear-gradient(92deg,#4F7CFF,#22D3EE);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);
+    font-family:'Inter','Segoe UI',system-ui,sans-serif;line-height:1.6;
+    -webkit-font-smoothing:antialiased}
+  a{text-decoration:none;color:inherit}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+  /* top bar */
+  header{position:sticky;top:0;z-index:10;backdrop-filter:blur(10px);
+    background:rgba(7,10,18,.7);border-bottom:1px solid var(--line)}
+  .bar{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:baseline;gap:8px}
+  .logo{font-size:21px;font-weight:800;letter-spacing:-.02em}
+  .logo span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .byline{font-size:12px;color:var(--dim);font-weight:600}
+  .nav a{color:var(--dim);font-size:14px;font-weight:600;margin-left:22px;transition:color .15s}
+  .nav a:hover{color:var(--text)}
+  .btn{display:inline-block;padding:10px 20px;border-radius:10px;font-weight:700;font-size:14px;
+    background:var(--grad);color:#06101e;transition:transform .15s,box-shadow .15s}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(79,124,255,.3)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn.ghost:hover{border-color:var(--accent2);box-shadow:none}
+
+  /* hero */
+  .hero{text-align:center;padding:92px 0 70px}
+  .pill{display:inline-block;font-size:12.5px;font-weight:700;color:var(--accent2);
+    background:rgba(34,211,238,.08);border:1px solid var(--line);border-radius:999px;
+    padding:6px 14px;margin-bottom:22px}
+  .hero h1{font-size:52px;line-height:1.1;font-weight:800;letter-spacing:-.03em;margin-bottom:18px}
+  .hero h1 span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{font-size:18px;color:var(--dim);max-width:620px;margin:0 auto 30px}
+  .cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+
+  /* product cards */
+  .section-label{text-align:center;font-size:12.5px;font-weight:800;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent2);margin:30px 0 8px}
+  .section-title{text-align:center;font-size:28px;font-weight:800;margin-bottom:40px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:20px;
+    padding:32px;transition:transform .18s,border-color .18s;position:relative;overflow:hidden}
+  .card:hover{transform:translateY(-4px);border-color:var(--accent2)}
+  .card .ico{font-size:30px;width:58px;height:58px;border-radius:14px;background:var(--panel2);
+    border:1px solid var(--line);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+  .card .tag{font-size:12px;font-weight:700;color:var(--accent2);letter-spacing:.05em}
+  .card h3{font-size:22px;font-weight:800;margin:4px 0 8px}
+  .card .lead{color:var(--dim);font-size:14.5px;margin-bottom:18px}
+  .feat{list-style:none;margin-bottom:24px}
+  .feat li{font-size:14px;color:var(--text);padding:5px 0 5px 26px;position:relative}
+  .feat li::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:800}
+  .card .actions{display:flex;gap:10px;flex-wrap:wrap}
+
+  /* stats strip */
+  .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin:64px 0;
+    background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px}
+  .strip .n{font-size:26px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .strip .l{font-size:12.5px;color:var(--dim)}
+
+  footer{border-top:1px solid var(--line);margin-top:70px;padding:34px 0;color:var(--dim);font-size:13px}
+  .foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+  .foot a{color:var(--accent2);font-weight:700}
+
+  @media(max-width:760px){
+    .hero h1{font-size:36px}.grid{grid-template-columns:1fr}
+    .strip{grid-template-columns:1fr 1fr}.nav{display:none}
+  }
+</style>
+</head>
+<body>
+  <header><div class="wrap bar">
+    <div class="brand">
+      <img src="/static/logo.png" alt="" width="30" height="30" style="border-radius:8px"/>
+      <div class="logo">Zen<span>Reach</span></div>
+      <div class="byline">by NexZen</div>
+    </div>
+    <nav class="nav">
+      <a href="#products">Products</a>
+      <a href="#whatsapp">WhatsApp</a>
+      <a href="#mail">Mail</a>
+      <a href="https://nexzen.me" target="_blank" rel="noreferrer">nexzen.me</a>
+    </nav>
+    <a class="btn" href="/console">Open app →</a>
+  </div></header>
+
+  <section class="hero wrap">
+    <div class="pill">India-first · Built for the world</div>
+    <h1>One studio to <span>reach every customer</span><br/>on WhatsApp &amp; email.</h1>
+    <p>NexZen builds the tools that scale your outreach — run WhatsApp campaigns and send
+       personalized bulk email with certificates, from a single clean dashboard.</p>
+    <div class="cta">
+      <a class="btn" href="/console">Launch ZenReach</a>
+      <a class="btn ghost" href="/mail">Open Mail Studio</a>
+    </div>
+  </section>
+
+  <div class="wrap" id="products">
+    <div class="section-label">Two products · one platform</div>
+    <h2 class="section-title">Pick how you want to reach them</h2>
+    <div class="grid">
+
+      <!-- WhatsApp -->
+      <div class="card" id="whatsapp">
+        <div class="ico">🟢</div>
+        <div class="tag">ZENREACH · WHATSAPP</div>
+        <h3>WhatsApp Campaign Suite</h3>
+        <p class="lead">Multi-tenant WhatsApp marketing on the official Meta Cloud API —
+           approved templates, real delivery analytics and a shared team inbox.</p>
+        <ul class="feat">
+          <li>Upload contacts (Excel/CSV) — auto phone &amp; name detection, E.164 cleanup</li>
+          <li>Approved-template campaigns with live phone preview &amp; scheduling</li>
+          <li>Queue engine: rate limits, retries, opt-in &amp; suppression enforced</li>
+          <li>Delivery / read / failed analytics with "why it failed" fixes</li>
+          <li>Team inbox, roles, billing, API keys &amp; AI copy assist</li>
+        </ul>
+        <div class="actions">
+          <a class="btn" href="/console">Open ZenReach</a>
+          <a class="btn ghost" href="/whatsapp">Quick demo</a>
+        </div>
+      </div>
+
+      <!-- Mail -->
+      <div class="card" id="mail">
+        <div class="ico">✉️</div>
+        <div class="tag">ZENREACH · MAIL</div>
+        <h3>Mail &amp; Certificate Studio</h3>
+        <p class="lead">Personalized bulk email with auto-generated certificates —
+           perfect for events, courses, webinars and outreach at scale.</p>
+        <ul class="feat">
+          <li>Mail-merge from your spreadsheet with custom placeholders</li>
+          <li>Auto-stamp each recipient's name onto a certificate template</li>
+          <li>Attach documents, CC, registration links &amp; rich HTML bodies</li>
+          <li>Smart send pacing with rate-limit retry to protect deliverability</li>
+          <li>Per-recipient sent/failed report exported to Excel</li>
+        </ul>
+        <div class="actions">
+          <a class="btn" href="/mail">Open Mail Studio</a>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="strip">
+      <div><div class="n">2</div><div class="l">products, one login</div></div>
+      <div><div class="n">Meta</div><div class="l">official Cloud API</div></div>
+      <div><div class="n">Multi-tenant</div><div class="l">orgs, roles &amp; billing</div></div>
+      <div><div class="n">AI</div><div class="l">copy &amp; report assist</div></div>
+    </div>
+  </div>
+
+  <footer><div class="wrap foot">
+    <span>Built by <a href="https://nexzen.me" target="_blank" rel="noreferrer">NexZen</a> — We Build. You Scale.</span>
+    <span>© NexZen · ZenReach for WhatsApp &amp; Mail</span>
+  </div></footer>
+</body>
+</html>

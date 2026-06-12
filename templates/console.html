@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ZenReach by NexZen · Console</title>
+<link rel="icon" type="image/png" href="/static/logo.png" />
+<style>
+  html,body{margin:0;background:#070A12}
+  #root:empty::after{content:"Loading…";color:#8A96AD;font-family:system-ui;display:block;padding:40px;text-align:center}
+</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+const T = { bg:"#070A12", panel:"#0D1220", line:"#1C2438", text:"#EAF0FA", dim:"#8A96AD",
+  accent:"#4F7CFF", accent2:"#22D3EE", green:"#34D399", amber:"#FBBF24", red:"#F87171",
+  grad:"linear-gradient(92deg,#4F7CFF,#22D3EE)" };
+
+async function api(path, method="GET", body) {
+  const opt = { method, headers: {} };
+  if (body instanceof FormData) opt.body = body;
+  else if (body) { opt.headers["Content-Type"]="application/json"; opt.body=JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  let j = {}; try { j = await r.json(); } catch(e){}
+  if (!r.ok) throw new Error(j.error || ("HTTP "+r.status));
+  return j;
+}
+
+const card = { background:T.panel, border:`1px solid ${T.line}`, borderRadius:14, padding:20, marginBottom:16 };
+const inp = { width:"100%", boxSizing:"border-box", background:T.bg, color:T.text, border:`1px solid ${T.line}`, borderRadius:9, padding:"10px 12px", fontSize:13.5, marginBottom:10 };
+const Btn = ({primary,danger,children,style,...p}) => <button {...p} style={{padding:"9px 16px",borderRadius:9,fontWeight:700,fontSize:13,cursor:"pointer",border:primary||danger?"none":`1px solid ${T.line}`,background:primary?T.grad:danger?T.red:"transparent",color:primary||danger?"#06101e":T.text,...style}}>{children}</button>;
+const Badge = ({tone,children}) => { const c={ok:[T.green,"#0d2a1f"],warn:[T.amber,"#2b2310"],bad:[T.red,"#2b1414"],info:[T.accent2,"#0c2230"]}[tone||"info"]; return <span style={{background:c[1],color:c[0],padding:"2px 9px",borderRadius:999,fontSize:11,fontWeight:700}}>{children}</span>; };
+const H1 = ({children}) => <h1 style={{fontSize:22,fontWeight:800,margin:"0 0 16px"}}>{children}</h1>;
+const Stat = ({v,l,c}) => <div><div style={{fontSize:26,fontWeight:800,color:c||T.text}}>{v}</div><div style={{fontSize:12,color:T.dim}}>{l}</div></div>;
+
+/* ===================== AUTH ===================== */
+function Brand({sub}) {
+  return <div style={{marginBottom:18}}>
+    <div style={{display:"flex",alignItems:"center",gap:10}}>
+      <img src="/static/logo.png" alt="" width="38" height="38" style={{borderRadius:10}}/>
+      <div>
+        <div style={{fontSize:22,fontWeight:800}}>Zen<span style={{background:T.grad,WebkitBackgroundClip:"text",color:"transparent"}}>Reach</span></div>
+        <div style={{color:T.dim,fontSize:11.5,fontWeight:600}}>by NexZen</div>
+      </div>
+    </div>
+    {sub && <div style={{color:T.dim,fontSize:12.5,marginTop:10}}>{sub}</div>}
+  </div>;
+}
+function Auth({ onAuth }) {
+  const [mode,setMode]=useState("login");
+  const [f,setF]=useState({email:"",password:"",org_name:"",category:"retail",totp:""});
+  const [need2fa,setNeed2fa]=useState(false);
+  const [err,setErr]=useState("");
+  const [info,setInfo]=useState("");
+  const [reset,setReset]=useState({token:"",password:""});
+  const submit=async()=>{ setErr(""); setInfo("");
+    try {
+      if(mode==="signup"){ await api("/api/auth/signup","POST",f); onAuth(); }
+      else if(mode==="login"){ const r=await api("/api/auth/login","POST",f); if(r.need_2fa){setNeed2fa(true);setErr("Enter your 2FA code.");return;} onAuth(); }
+      else if(mode==="forgot"){ const r=await api("/api/auth/reset/request","POST",{email:f.email});
+        if(r.emailed){ setInfo("✅ Reset code emailed. Paste it below."); }
+        else { setReset({...reset,token:r.reset_token||""}); setInfo("No email configured — code filled in below. Set a new password."); }
+        setMode("reset"); }
+      else if(mode==="reset"){ await api("/api/auth/reset/confirm","POST",{token:reset.token,password:reset.password});
+        setInfo("✅ Password updated. Sign in."); setMode("login"); }
+    } catch(e){ setErr(e.message); }
+  };
+  const labels={login:"Sign in",signup:"Create account & org",forgot:"Send reset code",reset:"Set new password"};
+  return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Inter,system-ui",color:T.text}}>
+    <div style={{width:380,...card,padding:28}}>
+      <Brand sub={"WhatsApp Campaign Suite — "+({login:"sign in",signup:"create account",forgot:"reset password",reset:"reset password"}[mode])}/>
+      {mode==="signup" && <input style={inp} placeholder="Organization name" value={f.org_name} onChange={e=>setF({...f,org_name:e.target.value})}/>}
+      {mode==="signup" && <select style={inp} value={f.category} onChange={e=>setF({...f,category:e.target.value})}><option value="retail">Retail</option><option value="services">Services</option><option value="education">Education</option><option value="events">Events</option><option value="general">General</option></select>}
+      {mode!=="reset" && <input style={inp} placeholder="Email" value={f.email} onChange={e=>setF({...f,email:e.target.value})}/>}
+      {(mode==="login"||mode==="signup") && <input style={inp} type="password" placeholder="Password (8+ chars)" value={f.password} onChange={e=>setF({...f,password:e.target.value})}/>}
+      {mode==="login" && need2fa && <input style={inp} placeholder="2FA code" value={f.totp} onChange={e=>setF({...f,totp:e.target.value})}/>}
+      {mode==="reset" && <input style={inp} placeholder="Reset code" value={reset.token} onChange={e=>setReset({...reset,token:e.target.value})}/>}
+      {mode==="reset" && <input style={inp} type="password" placeholder="New password (8+ chars)" value={reset.password} onChange={e=>setReset({...reset,password:e.target.value})}/>}
+      {err && <div style={{color:T.red,fontSize:12.5,marginBottom:10}}>{err}</div>}
+      {info && <div style={{color:T.green,fontSize:12.5,marginBottom:10}}>{info}</div>}
+      <Btn primary style={{width:"100%"}} onClick={submit}>{labels[mode]}</Btn>
+      <div style={{textAlign:"center",marginTop:14,fontSize:12.5,color:T.dim}}>
+        {mode==="login" && <span><span style={{cursor:"pointer",color:T.accent2}} onClick={()=>{setMode("forgot");setErr("");setInfo("");}}>Forgot password?</span> · <span style={{cursor:"pointer"}} onClick={()=>{setMode("signup");setErr("");}}>Sign up</span></span>}
+        {mode==="signup" && <span style={{cursor:"pointer"}} onClick={()=>{setMode("login");setErr("");}}>Have an account? Sign in</span>}
+        {(mode==="forgot"||mode==="reset") && <span style={{cursor:"pointer"}} onClick={()=>{setMode("login");setErr("");setInfo("");}}>← Back to sign in</span>}
+      </div>
+    </div>
+  </div>;
+}
+
+/* ===================== CREDENTIALS ===================== */
+function Credentials() {
+  const [c,setC]=useState({token:"",phone_id:"",waba_id:""});
+  const [state,setState]=useState(null);
+  const [cur,setCur]=useState(null);
+  useEffect(()=>{api("/api/credentials").then(setCur).catch(()=>{});},[]);
+  const verify=async()=>{ setState("busy");
+    try{ const r=await api("/api/credentials/verify","POST",c); setState(r); api("/api/credentials").then(setCur); }
+    catch(e){ setState({ok:false,error:e.message}); }
+  };
+  return <div><H1>API settings</H1>
+    {cur && cur.connected && <div style={{...card,color:T.green,background:"#0d2a1f"}}>✅ Connected: <b>{cur.verified_name}</b> ({cur.display_number}) · health {cur.health}</div>}
+    <div style={card}>
+      <div style={{color:T.dim,fontSize:12,marginBottom:6}}>Permanent Access Token</div>
+      <input style={inp} type="password" placeholder="EAAG…" value={c.token} onChange={e=>setC({...c,token:e.target.value})}/>
+      <div style={{color:T.dim,fontSize:12,marginBottom:6}}>Phone Number ID</div>
+      <input style={inp} value={c.phone_id} onChange={e=>setC({...c,phone_id:e.target.value})}/>
+      <div style={{color:T.dim,fontSize:12,marginBottom:6}}>WABA ID</div>
+      <input style={inp} value={c.waba_id} onChange={e=>setC({...c,waba_id:e.target.value})}/>
+      <Btn primary onClick={verify} disabled={state==="busy"}>{state==="busy"?"Verifying…":"Save & verify"}</Btn>
+      {state && state!=="busy" && <div style={{marginTop:12,fontSize:13,color:state.ok?T.green:T.red}}>{state.ok?`✅ ${state.name} · tier ${state.tier} · quality ${state.quality}`:`❌ ${state.error}${state.fix?" — "+state.fix:""}`}</div>}
+      <div style={{fontSize:11.5,color:T.dim,marginTop:12}}>🔒 Token stored AES-256-GCM encrypted server-side; never returned to the browser.</div>
+    </div>
+  </div>;
+}
+
+/* ===================== CONTACTS ===================== */
+function Contacts() {
+  const [parsed,setParsed]=useState(null);
+  const [map,setMap]=useState({phone_col:-1,name_col:-1,default_cc:"91",list_name:"",opt_in:true});
+  const [result,setResult]=useState(null);
+  const [list,setList]=useState([]);
+  const fileRef=useRef();
+  const load=()=>api("/api/contacts").then(d=>setList(d.contacts));
+  useEffect(()=>{load();},[]);
+  const onFile=async f=>{ const fd=new FormData(); fd.append("file",f);
+    const p=await api("/api/contacts/parse","POST",fd); setParsed(p); setMap({...map,phone_col:p.phone_col,name_col:p.name_col}); };
+  const doImport=async()=>{ const r=await api("/api/contacts/import","POST",{token:parsed.all_rows_token,...map});
+    setResult(r); setParsed(null); load(); };
+  return <div><H1>Contacts</H1>
+    <div style={card}>
+      <Btn onClick={()=>fileRef.current.click()}>📄 Upload sheet (.xlsx/.csv)</Btn>
+      <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}} onChange={e=>e.target.files[0]&&onFile(e.target.files[0])}/>
+      {parsed && <div style={{marginTop:14}}>
+        <div style={{color:T.dim,fontSize:12.5,marginBottom:8}}>{parsed.total} rows · pick columns</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <select style={{...inp,width:160}} value={map.phone_col} onChange={e=>setMap({...map,phone_col:+e.target.value})}>{parsed.headers.map((h,i)=><option key={i} value={i}>📞 {h}</option>)}</select>
+          <select style={{...inp,width:160}} value={map.name_col} onChange={e=>setMap({...map,name_col:+e.target.value})}><option value={-1}>— name —</option>{parsed.headers.map((h,i)=><option key={i} value={i}>{h}</option>)}</select>
+          <input style={{...inp,width:130}} placeholder="cc 91" value={map.default_cc} onChange={e=>setMap({...map,default_cc:e.target.value})}/>
+          <input style={{...inp,width:160}} placeholder="List name" value={map.list_name} onChange={e=>setMap({...map,list_name:e.target.value})}/>
+        </div>
+        <label style={{fontSize:12.5,color:T.dim,display:"block",margin:"4px 0 10px"}}><input type="checkbox" checked={map.opt_in} onChange={e=>setMap({...map,opt_in:e.target.checked})}/> Contacts are opted-in (consent recorded)</label>
+        <Btn primary onClick={doImport}>Import</Btn>
+      </div>}
+      {result && <div style={{marginTop:12,fontSize:13,color:T.green}}>✅ {result.valid} imported · {result.duplicates} dups · {result.invalid} invalid · {result.suppressed_skipped} suppressed-skipped</div>}
+    </div>
+    <div style={card}>
+      <div style={{fontWeight:700,marginBottom:10}}>Contacts ({list.length})</div>
+      {list.slice(0,50).map(c=><div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.line}`,fontSize:13}}>
+        <span>{c.name||"—"} <span style={{color:T.dim}}>· {c.phone}</span></span>
+        <span>{c.opt_in?<Badge tone="ok">opted-in</Badge>:<Badge tone="warn">no opt-in</Badge>} <span style={{color:T.dim,fontSize:11,marginLeft:6}}>{c.country}</span></span>
+      </div>)}
+    </div>
+  </div>;
+}
+
+/* ===================== TEMPLATES ===================== */
+function Templates() {
+  const [gallery,setGallery]=useState([]);
+  const [mine,setMine]=useState([]);
+  const [nt,setNt]=useState({name:"",category:"MARKETING",language:"en_US",body:""});
+  const load=()=>api("/api/templates").then(d=>setMine(d.templates));
+  useEffect(()=>{api("/api/templates/gallery").then(d=>setGallery(d.gallery));load();},[]);
+  const create=async()=>{ await api("/api/templates","POST",nt); setNt({...nt,name:"",body:""}); load(); };
+  const sync=async()=>{ try{await api("/api/templates/sync","POST",{});load();}catch(e){alert(e.message);} };
+  return <div><H1>Templates</H1>
+    <div style={card}>
+      <div style={{fontWeight:700,marginBottom:10}}>Create & submit to Meta</div>
+      <input style={inp} placeholder="template_name" value={nt.name} onChange={e=>setNt({...nt,name:e.target.value})}/>
+      <div style={{display:"flex",gap:10}}>
+        <select style={{...inp,width:160}} value={nt.category} onChange={e=>setNt({...nt,category:e.target.value})}><option>MARKETING</option><option>UTILITY</option><option>AUTHENTICATION</option></select>
+        <input style={{...inp,width:120}} value={nt.language} onChange={e=>setNt({...nt,language:e.target.value})}/>
+      </div>
+      <textarea style={{...inp,height:80}} placeholder="Body with {{1}} {{2}}" value={nt.body} onChange={e=>setNt({...nt,body:e.target.value})}/>
+      <Btn primary onClick={create}>Create</Btn> <Btn onClick={sync}>↻ Sync from Meta</Btn>
+    </div>
+    <div style={card}>
+      <div style={{fontWeight:700,marginBottom:10}}>My templates</div>
+      {mine.map(t=><div key={t.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.line}`,fontSize:13}}>
+        <span>{t.name} <span style={{color:T.dim}}>· {t.category}</span></span>
+        <Badge tone={t.status==="APPROVED"?"ok":t.status==="REJECTED"?"bad":"warn"}>{t.status}</Badge>
+      </div>)}
+      {!mine.length && <div style={{color:T.dim,fontSize:12.5}}>None yet. Create one or sync.</div>}
+    </div>
+    <div style={card}>
+      <div style={{fontWeight:700,marginBottom:10}}>Gallery (approval-friendly)</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>
+        {gallery.map(t=><div key={t.label} style={{border:`1px solid ${T.line}`,borderRadius:10,padding:12}}>
+          <div style={{fontWeight:700,fontSize:13}}>{t.emoji} {t.label} <Badge tone="info">{t.category}</Badge></div>
+          <div style={{color:T.dim,fontSize:12,marginTop:6,lineHeight:1.5}}>{t.text}</div>
+          <Btn style={{marginTop:8,fontSize:12,padding:"5px 10px"}} onClick={()=>setNt({name:t.label.toLowerCase().replace(/ /g,"_"),category:t.category,language:"en_US",body:t.text})}>Use</Btn>
+        </div>)}
+      </div>
+    </div>
+  </div>;
+}
+
+/* ===================== CAMPAIGN ===================== */
+function Campaign() {
+  const [lists,setLists]=useState([]);
+  const [tmpls,setTmpls]=useState([]);
+  const [f,setF]=useState({name:"",list_id:"",template:"",lang:"en_US",throughput:20,warmup:false,opt_in_attested:false});
+  const [pf,setPf]=useState(null);
+  const [job,setJob]=useState(null);
+  const poll=useRef();
+  useEffect(()=>{api("/api/lists").then(d=>setLists(d.lists));api("/api/templates").then(d=>setTmpls(d.templates));return()=>clearInterval(poll.current);},[]);
+  const preflight=async()=>setPf((await api("/api/campaigns/preflight","POST",f)));
+  const launch=async()=>{ try{
+    const r=await api("/api/campaigns","POST",f); setJob({id:r.campaign_id,demo:r.demo});
+    poll.current=setInterval(async()=>{ const s=await api(`/api/campaigns/${r.campaign_id}/status`);
+      setJob(j=>({...j,...s})); if(!s.running && ["done","cancelled"].includes(s.status)) clearInterval(poll.current);
+    },500);
+  }catch(e){alert(e.message);} };
+  return <div><H1>New campaign</H1>
+    <div style={card}>
+      <input style={inp} placeholder="Campaign name" value={f.name} onChange={e=>setF({...f,name:e.target.value})}/>
+      <select style={inp} value={f.list_id} onChange={e=>setF({...f,list_id:e.target.value})}><option value="">— pick list —</option>{lists.map(l=><option key={l.id} value={l.id}>{l.name} ({l.count})</option>)}</select>
+      <select style={inp} value={f.template} onChange={e=>setF({...f,template:e.target.value})}><option value="">— template (demo: any) —</option>{tmpls.map(t=><option key={t.id} value={t.name}>{t.name} · {t.status}</option>)}</select>
+      <div style={{display:"flex",gap:10}}>
+        <input style={{...inp,width:120}} type="number" value={f.throughput} onChange={e=>setF({...f,throughput:+e.target.value})} placeholder="msg/sec"/>
+        <label style={{fontSize:12.5,color:T.dim}}><input type="checkbox" checked={f.warmup} onChange={e=>setF({...f,warmup:e.target.checked})}/> warmup</label>
+      </div>
+      <label style={{fontSize:12.5,color:T.amber,display:"block",margin:"6px 0"}}><input type="checkbox" checked={f.opt_in_attested} onChange={e=>setF({...f,opt_in_attested:e.target.checked})}/> I attest this list is opted-in</label>
+      <Btn onClick={preflight}>Run pre-flight</Btn> <Btn primary onClick={launch} disabled={!f.opt_in_attested}>Launch</Btn>
+    </div>
+    {pf && <div style={card}>
+      <div style={{fontWeight:700,marginBottom:8}}>Campaign health {pf.ok?<Badge tone="ok">ready</Badge>:<Badge tone="bad">blocked</Badge>}</div>
+      {pf.checks.map(c=><div key={c.key} style={{fontSize:13,padding:"3px 0"}}>{c.pass?"✅":"⛔"} {c.label}</div>)}
+    </div>}
+    {job && <div style={card}>
+      <div style={{fontWeight:700}}>Campaign {job.running?"running…":"finished"} {job.demo&&<Badge tone="warn">demo</Badge>}</div>
+      <div style={{display:"flex",gap:24,marginTop:12}}>
+        <Stat v={job.sent||0} l="sent" c={T.green}/><Stat v={job.delivered||0} l="delivered" c={T.accent2}/>
+        <Stat v={job.failed||0} l="failed" c={T.red}/><Stat v={job.skipped||0} l="skipped" c={T.amber}/>
+        <Stat v={job.queued||0} l="queued"/>
+      </div>
+      {job.running && <div style={{marginTop:10}}><Btn onClick={()=>api(`/api/campaigns/${job.id}/pause`,"POST")}>Pause</Btn> <Btn danger onClick={()=>api(`/api/campaigns/${job.id}/cancel`,"POST")}>Cancel</Btn></div>}
+    </div>}
+  </div>;
+}
+
+/* ===================== REPORTS ===================== */
+function Reports() {
+  const [camps,setCamps]=useState([]);
+  const [rep,setRep]=useState(null);
+  const [ai,setAi]=useState("");
+  useEffect(()=>{api("/api/campaigns").then(d=>setCamps(d.campaigns));},[]);
+  const open=async cid=>{ setRep(await api(`/api/reports/campaign/${cid}`)); setAi("");
+    api(`/api/ai/summary/${cid}`).then(d=>setAi(d.summary)).catch(()=>{}); };
+  const exp=async cid=>{ const r=await api(`/api/reports/campaign/${cid}/export`,"POST",{format:"xlsx"}); alert("Export queued: "+r.export_id+" (see Exports)"); };
+  return <div><H1>Reports</H1>
+    {!rep ? <div style={card}>{camps.map(c=><div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${T.line}`,fontSize:13,cursor:"pointer"}} onClick={()=>open(c.id)}>
+      <span>{c.name} <span style={{color:T.dim}}>· {c.template_name}</span></span>
+      <span><Badge tone={c.status==="done"?"ok":"info"}>{c.status}</Badge> <span style={{color:T.dim,marginLeft:8}}>{c.delivered}/{c.attempted} del</span></span>
+    </div>)}{!camps.length&&<div style={{color:T.dim}}>No campaigns yet.</div>}</div>
+    : <div>
+      <Btn onClick={()=>setRep(null)}>← back</Btn>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,margin:"14px 0"}}>
+        {[["Total",rep.cards.total],["Attempted",rep.cards.attempted],["Sent",rep.cards.sent,T.green],["Delivered",rep.cards.delivered,T.accent2],["Read",rep.cards.read,T.accent2],["Failed",rep.cards.failed,T.red],["Skipped",rep.cards.skipped,T.amber],["Read %",rep.cards.read_rate]].map(([l,v,c])=><div key={l} style={{...card,marginBottom:0,padding:14}}><Stat v={v} l={l} c={c}/></div>)}
+      </div>
+      {ai && <div style={{...card,whiteSpace:"pre-wrap",fontSize:13}}>🤖 {ai}</div>}
+      <div style={card}><div style={{fontWeight:700,marginBottom:8}}>Why messages failed</div>
+        {Object.entries(rep.failures).map(([l,info])=><div key={l} style={{fontSize:13,marginBottom:6}}>• {l} <span style={{color:T.dim}}>×{info.count}</span><div style={{fontSize:12,color:T.dim}}>💡 {info.fix}</div></div>)}
+        {!Object.keys(rep.failures).length && <div style={{color:T.dim,fontSize:13}}>No failures 🎉</div>}
+      </div>
+      <Btn onClick={()=>exp(rep.campaign.id)}>⬇ Export XLSX</Btn>
+    </div>}
+  </div>;
+}
+
+/* ===================== INBOX ===================== */
+function Inbox() {
+  const [convos,setConvos]=useState([]);
+  const [thread,setThread]=useState(null);
+  const [txt,setTxt]=useState("");
+  const load=()=>api("/api/inbox").then(d=>setConvos(d.conversations));
+  useEffect(()=>{load();},[]);
+  const open=async id=>setThread(await api(`/api/inbox/${id}`));
+  const reply=async()=>{ try{await api(`/api/inbox/${thread.conversation.id}/reply`,"POST",{text:txt});setTxt("");open(thread.conversation.id);}catch(e){alert(e.message);} };
+  return <div><H1>Inbox</H1>
+    <div style={{display:"flex",gap:14}}>
+      <div style={{width:240}}>{convos.map(c=><div key={c.id} style={{...card,marginBottom:8,padding:12,cursor:"pointer"}} onClick={()=>open(c.id)}>
+        <div style={{fontSize:13,fontWeight:600}}>{c.contact_name||c.contact_phone}</div>
+        <div style={{fontSize:11,color:T.dim}}>{c.window_open?<Badge tone="ok">window open</Badge>:<Badge tone="warn">closed</Badge>} {c.unread>0&&<Badge tone="info">{c.unread}</Badge>}</div>
+      </div>)}{!convos.length&&<div style={{color:T.dim,fontSize:12.5}}>No conversations.</div>}</div>
+      {thread && <div style={{flex:1,...card}}>
+        <div style={{fontWeight:700,marginBottom:10}}>{thread.conversation.contact_phone}</div>
+        <div style={{maxHeight:300,overflowY:"auto",marginBottom:10}}>{thread.messages.map(m=><div key={m.id} style={{textAlign:m.direction==="out"?"right":"left",margin:"4px 0"}}><span style={{background:m.direction==="out"?"#005C4B":T.line,padding:"6px 10px",borderRadius:8,fontSize:13,display:"inline-block"}}>{m.body}</span></div>)}</div>
+        {thread.conversation.window_open ? <div style={{display:"flex",gap:8}}><input style={{...inp,marginBottom:0}} value={txt} onChange={e=>setTxt(e.target.value)} placeholder="Reply…"/><Btn primary onClick={reply}>Send</Btn></div>
+          : <div style={{color:T.amber,fontSize:12.5}}>24h window closed — template-only.</div>}
+      </div>}
+    </div>
+  </div>;
+}
+
+/* ===================== DASHBOARD ===================== */
+function Dashboard() {
+  const [d,setD]=useState(null);
+  useEffect(()=>{api("/api/reports/dashboard").then(setD).catch(()=>{});},[]);
+  if(!d) return <div><H1>Dashboard</H1><div style={{color:T.dim}}>Loading…</div></div>;
+  return <div><H1>Dashboard</H1>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:16}}>
+      {[["Attempted",d.totals.attempted],["Delivered",d.totals.delivered,T.green],["Read",d.totals.read,T.accent2],["Failed",d.totals.failed,T.red],["Clicks",d.totals.clicks],["Opt-outs",d.opt_outs,T.amber]].map(([l,v,c])=><div key={l} style={{...card,marginBottom:0,padding:14}}><Stat v={v} l={l} c={c}/></div>)}
+    </div>
+    <div style={card}>Quality rating: <b>{d.quality}</b> · Tier: <b>{d.tier}</b>/24h · Meta spend: <b>₹{d.spend_inr}</b></div>
+    <div style={card}><div style={{fontWeight:700,marginBottom:8}}>Best templates by read rate</div>{d.best_templates.map(t=><div key={t.template_name} style={{fontSize:13,padding:"3px 0"}}>{t.template_name} — {Math.round(t.read_rate)}% ({t.runs} runs)</div>)}{!d.best_templates.length&&<div style={{color:T.dim,fontSize:12.5}}>No data yet.</div>}</div>
+  </div>;
+}
+
+/* ===================== BILLING / TEAM / KEYS / ADMIN ===================== */
+function Billing() {
+  const [u,setU]=useState(null);const [plans,setPlans]=useState([]);
+  useEffect(()=>{api("/api/billing/usage").then(setU);api("/api/billing/plans").then(d=>setPlans(d.plans));},[]);
+  const sub=async p=>{try{const r=await api("/api/billing/subscribe","POST",{plan_id:p,gateway:"razorpay"});alert("Subscribed: "+r.plan+"\n"+r.checkout_stub);}catch(e){alert(e.message);}};
+  return <div><H1>Billing</H1>
+    {u && <div style={card}><div style={{fontWeight:700,marginBottom:8}}>Usage · {u.period}</div>
+      <div>Messages: {u.messages_used}/{u.messages_limit} {u.warning&&<Badge tone="warn">80%+</Badge>}{u.blocked&&<Badge tone="bad">cap hit</Badge>}</div>
+      <div style={{fontSize:12.5,color:T.dim,marginTop:4}}>Seats {u.seats} · Contacts {u.contacts}</div>
+      <div style={{fontSize:12,color:T.accent2,marginTop:6}}>💡 {u.tip}</div></div>}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10}}>
+      {plans.map(p=><div key={p.id} style={card}><div style={{fontWeight:700}}>{p.name}</div><div style={{fontSize:22,fontWeight:800,margin:"6px 0"}}>₹{p.price_inr}<span style={{fontSize:12,color:T.dim}}>/mo</span></div>
+        <div style={{fontSize:12,color:T.dim}}>{p.monthly_messages.toLocaleString()} msgs · {p.seats} seats</div>
+        {p.white_label?<Badge tone="info">white-label</Badge>:null} {p.api_access?<Badge tone="info">API</Badge>:null}
+        <div style={{marginTop:8}}><Btn primary onClick={()=>sub(p.id)}>Choose</Btn></div></div>)}
+    </div>
+  </div>;
+}
+function Team() {
+  const [m,setM]=useState([]);const [inv,setInv]=useState({email:"",role:"agent"});
+  const load=()=>api("/api/members").then(d=>setM(d.members)).catch(()=>{});
+  useEffect(()=>{load();},[]);
+  const invite=async()=>{try{const r=await api("/api/members/invite","POST",inv);
+    alert(r.emailed ? ("✅ Invite emailed to "+inv.email) : ("No SMTP configured — share this link:\n"+r.invite_link));
+  }catch(e){alert(e.message);}};
+  return <div><H1>Team</H1>
+    <div style={card}><input style={{...inp,width:200,display:"inline-block"}} placeholder="email" value={inv.email} onChange={e=>setInv({...inv,email:e.target.value})}/>
+      <select style={{...inp,width:120,display:"inline-block",marginLeft:8}} value={inv.role} onChange={e=>setInv({...inv,role:e.target.value})}><option>owner</option><option>admin</option><option>agent</option><option>viewer</option></select>
+      <Btn primary style={{marginLeft:8}} onClick={invite}>Invite</Btn></div>
+    <div style={card}>{m.map(x=><div key={x.email} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.line}`,fontSize:13}}><span>{x.name} · {x.email}</span><Badge tone="info">{x.role}</Badge></div>)}</div>
+  </div>;
+}
+function Keys() {
+  const [keys,setKeys]=useState([]);const [shown,setShown]=useState("");
+  const load=()=>api("/api/keys").then(d=>setKeys(d.keys)).catch(()=>{});
+  useEffect(()=>{load();},[]);
+  const make=async()=>{const r=await api("/api/keys","POST",{name:"key"});setShown(r.api_key);load();};
+  const revoke=async id=>{ if(!confirm("Revoke this key? Apps using it stop working immediately.")) return; await api("/api/keys/"+id,"DELETE"); load(); };
+  return <div><H1>API keys (Enterprise)</H1>
+    <div style={{fontSize:12.5,color:T.dim,marginBottom:12}}>Use these to call the public REST API (<code>/v1/contacts</code>, <code>/v1/campaigns</code>, <code>/v1/reports</code>) from your own systems — different from your WhatsApp credentials. Requires the Enterprise plan.</div>
+    <div style={card}><Btn primary onClick={make}>Generate key</Btn>{shown&&<div style={{marginTop:10,fontFamily:"monospace",fontSize:12,color:T.green,wordBreak:"break-all"}}>{shown}<div style={{color:T.amber,fontSize:11}}>Shown once — copy now.</div></div>}</div>
+    <div style={card}>{keys.map(k=><div key={k.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:`1px solid ${T.line}`,fontSize:13}}>
+      <span>{k.name} · {k.prefix}…</span>
+      <span style={{display:"flex",gap:8,alignItems:"center"}}>{k.revoked?<Badge tone="bad">revoked</Badge>:<Badge tone="ok">active</Badge>}
+        {!k.revoked && <Btn danger style={{fontSize:11,padding:"3px 10px"}} onClick={()=>revoke(k.id)}>Revoke</Btn>}</span>
+    </div>)}{!keys.length&&<div style={{color:T.dim,fontSize:12.5}}>No keys yet.</div>}</div>
+  </div>;
+}
+function Admin() {
+  const [tab,setTab]=useState("orgs");
+  const tabs=[["orgs","Organizations"],["billing","Plans & trial"],["subs","Subscriptions"]];
+  return <div><H1>NexZen super-admin</H1>
+    <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
+      {tabs.map(([id,l])=><div key={id} onClick={()=>setTab(id)} style={{padding:"7px 14px",borderRadius:999,cursor:"pointer",fontSize:13,fontWeight:600,background:tab===id?"rgba(79,124,255,.16)":T.panel,color:tab===id?T.accent:T.dim,border:`1px solid ${tab===id?T.accent:T.line}`}}>{l}</div>)}
+    </div>
+    {tab==="orgs" && <AdminOrgs/>}
+    {tab==="billing" && <AdminPlans/>}
+    {tab==="subs" && <AdminSubs/>}
+  </div>;
+}
+function AdminOrgs() {
+  const [orgs,setOrgs]=useState([]);const [rev,setRev]=useState(null);
+  const load=()=>api("/api/admin/orgs").then(d=>setOrgs(d.orgs));
+  useEffect(()=>{load();api("/api/admin/revenue").then(setRev).catch(()=>{});},[]);
+  const susp=async(o,v)=>{await api(`/api/admin/orgs/${o}/suspend`,"POST",{suspend:v});load();};
+  return <div>
+    {rev && <div style={card}>Orgs: <b>{rev.total_orgs}</b> · Platform Meta spend: <b>₹{rev.platform_meta_spend_inr}</b></div>}
+    <div style={card}>{orgs.map(o=><div key={o.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${T.line}`,fontSize:13}}>
+      <span>{o.name} <span style={{color:T.dim}}>· {o.plan_id} · {o.members} members · {o.messages_period} msgs</span></span>
+      <span><Badge tone={o.connection==="healthy"?"ok":"warn"}>{o.connection}</Badge> {o.suspended?<Btn style={{fontSize:11,padding:"3px 8px"}} onClick={()=>susp(o.id,false)}>reactivate</Btn>:<Btn danger style={{fontSize:11,padding:"3px 8px"}} onClick={()=>susp(o.id,true)}>suspend</Btn>}</span>
+    </div>)}</div>
+  </div>;
+}
+function AdminPlans() {
+  const [plans,setPlans]=useState([]);const [trial,setTrial]=useState({trial_days:14,grace_days:3});const [msg,setMsg]=useState("");
+  const load=()=>{api("/api/admin/plans").then(d=>setPlans(d.plans));api("/api/admin/trial").then(setTrial);};
+  useEffect(()=>{load();},[]);
+  const edit=(i,k,v)=>setPlans(p=>p.map((x,j)=>j===i?{...x,[k]:v}:x));
+  const save=async p=>{try{await api("/api/admin/plans/"+p.id,"PUT",p);setMsg("✅ "+p.id+" saved");}catch(e){setMsg("❌ "+e.message);}};
+  const saveTrial=async()=>{try{await api("/api/admin/trial","PUT",trial);setMsg("✅ Trial config saved");}catch(e){setMsg("❌ "+e.message);}};
+  return <div>
+    <div style={card}>
+      <div style={{fontWeight:700,marginBottom:8}}>Free trial</div>
+      <div style={{display:"flex",gap:10,alignItems:"flex-end",flexWrap:"wrap"}}>
+        <div><div style={{fontSize:12,color:T.dim}}>Trial days</div><input style={{...inp,width:110,marginBottom:0}} type="number" value={trial.trial_days} onChange={e=>setTrial({...trial,trial_days:+e.target.value})}/></div>
+        <div><div style={{fontSize:12,color:T.dim}}>Grace days (before auto-suspend)</div><input style={{...inp,width:160,marginBottom:0}} type="number" value={trial.grace_days} onChange={e=>setTrial({...trial,grace_days:+e.target.value})}/></div>
+        <Btn primary onClick={saveTrial}>Save</Btn>
+      </div>
+      <div style={{fontSize:12,color:T.dim,marginTop:8}}>After trial_days + grace_days, free (starter) orgs are auto-suspended until they upgrade or you extend.</div>
+    </div>
+    {plans.map((p,i)=><div key={p.id} style={card}>
+      <div style={{fontWeight:700,marginBottom:8}}>{p.id}</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
+        <Lbl l="Name"><input style={ip} value={p.name||""} onChange={e=>edit(i,"name",e.target.value)}/></Lbl>
+        <Lbl l="Price ₹/mo"><input style={ip} type="number" value={p.price_inr} onChange={e=>edit(i,"price_inr",+e.target.value)}/></Lbl>
+        <Lbl l="Price $/mo"><input style={ip} type="number" value={p.price_usd} onChange={e=>edit(i,"price_usd",+e.target.value)}/></Lbl>
+        <Lbl l="Msgs/mo"><input style={ip} type="number" value={p.monthly_messages} onChange={e=>edit(i,"monthly_messages",+e.target.value)}/></Lbl>
+        <Lbl l="Seats"><input style={ip} type="number" value={p.seats} onChange={e=>edit(i,"seats",+e.target.value)}/></Lbl>
+        <Lbl l="Contacts"><input style={ip} type="number" value={p.contacts} onChange={e=>edit(i,"contacts",+e.target.value)}/></Lbl>
+      </div>
+      <Lbl l="Description"><textarea style={{...ip,height:50}} value={p.description||""} onChange={e=>edit(i,"description",e.target.value)}/></Lbl>
+      <div style={{display:"flex",gap:14,alignItems:"center",margin:"6px 0"}}>
+        <label style={{fontSize:12.5,color:T.dim}}><input type="checkbox" checked={!!p.white_label} onChange={e=>edit(i,"white_label",e.target.checked?1:0)}/> white-label</label>
+        <label style={{fontSize:12.5,color:T.dim}}><input type="checkbox" checked={!!p.api_access} onChange={e=>edit(i,"api_access",e.target.checked?1:0)}/> API access</label>
+      </div>
+      <Btn primary onClick={()=>save(p)}>Save {p.id}</Btn>
+    </div>)}
+    {msg && <div style={{fontSize:13,color:msg[0]==="✅"?T.green:T.red}}>{msg}</div>}
+  </div>;
+}
+function AdminSubs() {
+  const [subs,setSubs]=useState([]);const [plans,setPlans]=useState([]);
+  const load=()=>{api("/api/admin/subscriptions").then(d=>setSubs(d.subscriptions));api("/api/admin/plans").then(d=>setPlans(d.plans));};
+  useEffect(()=>{load();},[]);
+  const setPlan=async(o,pid)=>{await api(`/api/admin/orgs/${o}/plan`,"POST",{plan_id:pid,mark_paid:pid!=="starter"});load();};
+  const extend=async o=>{const d=prompt("Extend trial by how many days?","7");if(d)await api(`/api/admin/orgs/${o}/extend-trial`,"POST",{days:+d});load();};
+  const paid=async(o,v)=>{await api(`/api/admin/orgs/${o}/mark-paid`,"POST",{paid:v});load();};
+  return <div style={card}>
+    {subs.map(s=><div key={s.id} style={{padding:"10px 0",borderBottom:`1px solid ${T.line}`,fontSize:13}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+        <span>{s.name} {s.suspended?<Badge tone="bad">suspended</Badge>:s.trial_active?<Badge tone="warn">trial · {s.trial_days_left}d left</Badge>:s.paid?<Badge tone="ok">paid</Badge>:<Badge tone="info">unpaid</Badge>}</span>
+        <span style={{display:"flex",gap:6,alignItems:"center"}}>
+          <select style={{...ip,width:130}} value={s.plan_id||"starter"} onChange={e=>setPlan(s.id,e.target.value)}>{plans.map(p=><option key={p.id} value={p.id}>{p.name} ₹{p.price_inr}</option>)}</select>
+          <Btn style={{fontSize:11,padding:"3px 8px"}} onClick={()=>extend(s.id)}>Extend trial</Btn>
+          <Btn style={{fontSize:11,padding:"3px 8px"}} onClick={()=>paid(s.id,!s.paid)}>{s.paid?"Mark unpaid":"Mark paid"}</Btn>
+        </span>
+      </div>
+    </div>)}
+  </div>;
+}
+const ip={width:"100%",boxSizing:"border-box",background:T.bg,color:T.text,border:`1px solid ${T.line}`,borderRadius:8,padding:"7px 9px",fontSize:12.5,marginBottom:8};
+const Lbl=({l,children})=><label style={{display:"block",fontSize:11.5,color:T.dim,marginBottom:2}}>{l}{children}</label>;
+
+/* ===================== PROFILE & SETTINGS ===================== */
+function Profile({me,reload}) {
+  const [name,setName]=useState(me.user.name||"");
+  const [pw,setPw]=useState({current_password:"",new_password:""});
+  const [msg,setMsg]=useState("");
+  const saveName=async()=>{try{await api("/api/auth/profile","POST",{name});setMsg("✅ Name updated");reload();}catch(e){setMsg("❌ "+e.message);}};
+  const savePw=async()=>{try{await api("/api/auth/profile","POST",pw);setMsg("✅ Password changed");setPw({current_password:"",new_password:""});}catch(e){setMsg("❌ "+e.message);}};
+  return <div>
+    <div style={card}><div style={{fontWeight:700,marginBottom:10}}>Your details</div>
+      <div style={{color:T.dim,fontSize:12,marginBottom:6}}>Email (sign-in, cannot change)</div>
+      <input style={{...inp,opacity:.6}} value={me.user.email} disabled/>
+      <div style={{color:T.dim,fontSize:12,marginBottom:6}}>Display name</div>
+      <input style={inp} value={name} onChange={e=>setName(e.target.value)}/>
+      <Btn primary onClick={saveName}>Save name</Btn>
+    </div>
+    <div style={card}><div style={{fontWeight:700,marginBottom:10}}>Change password</div>
+      <input style={inp} type="password" placeholder="Current password" value={pw.current_password} onChange={e=>setPw({...pw,current_password:e.target.value})}/>
+      <input style={inp} type="password" placeholder="New password (8+ chars)" value={pw.new_password} onChange={e=>setPw({...pw,new_password:e.target.value})}/>
+      <Btn primary onClick={savePw}>Update password</Btn>
+    </div>
+    {msg && <div style={{fontSize:13,color:msg[0]==="✅"?T.green:T.red}}>{msg}</div>}
+  </div>;
+}
+function SmtpCfg() {
+  const [c,setC]=useState({user:"",pass:"",server:"smtp.hostinger.com",port:"465"});
+  const [cur,setCur]=useState(null);const [msg,setMsg]=useState("");
+  useEffect(()=>{api("/api/settings/smtp").then(d=>{setCur(d);setC(x=>({...x,user:d.user,server:d.server,port:d.port}));}).catch(()=>{});},[]);
+  const save=async()=>{try{await api("/api/settings/smtp","POST",c);setMsg("✅ SMTP saved — invites now email automatically.");api("/api/settings/smtp").then(setCur);}catch(e){setMsg("❌ "+e.message);}};
+  return <div style={card}>
+    <div style={{fontWeight:700,marginBottom:6}}>Email / SMTP (optional)</div>
+    <div style={{fontSize:12.5,color:T.dim,marginBottom:12,lineHeight:1.5}}>Add SMTP to <b>send team invitations automatically by email</b>. Leave empty and invites still work — you just share the join link manually. {cur&&cur.configured&&<Badge tone="ok">configured</Badge>}</div>
+    <input style={inp} placeholder="SMTP user (you@domain.com)" value={c.user} onChange={e=>setC({...c,user:e.target.value})}/>
+    <input style={inp} type="password" placeholder="SMTP password" value={c.pass} onChange={e=>setC({...c,pass:e.target.value})}/>
+    <div style={{display:"flex",gap:10}}>
+      <input style={{...inp,flex:1}} placeholder="server" value={c.server} onChange={e=>setC({...c,server:e.target.value})}/>
+      <input style={{...inp,width:90}} placeholder="port" value={c.port} onChange={e=>setC({...c,port:e.target.value})}/>
+    </div>
+    <Btn primary onClick={save}>Save SMTP</Btn>
+    {msg && <div style={{fontSize:13,marginTop:10,color:msg[0]==="✅"?T.green:T.red}}>{msg}</div>}
+  </div>;
+}
+function Settings({me}) {
+  const role=(me.orgs.find(o=>o.id===me.active_org)||{}).role||"viewer";
+  const isOwner=role==="owner";
+  const isAdmin=role==="owner"||role==="admin";
+  const tabs=[["profile","Profile"],["connections","Connections"]];
+  if(isOwner) tabs.push(["email","Email / SMTP"]);
+  tabs.push(["billing","Billing"]);
+  const [tab,setTab]=useState("profile");
+  return <div><H1>Settings</H1>
+    <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
+      {tabs.map(([id,l])=><div key={id} onClick={()=>setTab(id)} style={{padding:"7px 14px",borderRadius:999,cursor:"pointer",fontSize:13,fontWeight:600,background:tab===id?"rgba(79,124,255,.16)":T.panel,color:tab===id?T.accent:T.dim,border:`1px solid ${tab===id?T.accent:T.line}`}}>{l}</div>)}
+    </div>
+    {tab==="profile" && <Profile me={me} reload={()=>location.reload()}/>}
+    {tab==="connections" && <div>
+      {isAdmin ? <Credentials/> : <div style={card}>WhatsApp credentials are managed by admins.</div>}
+      <div style={{height:8}}/>
+      {isAdmin ? <Keys/> : <div style={card}>API keys are managed by admins.</div>}
+    </div>}
+    {tab==="email" && isOwner && <SmtpCfg/>}
+    {tab==="billing" && <Billing/>}
+  </div>;
+}
+
+/* ===================== SHELL ===================== */
+function App() {
+  const [me,setMe]=useState(undefined);
+  const [view,setView]=useState("dashboard");
+  const [menu,setMenu]=useState(false);
+  const loadMe=()=>api("/api/auth/me").then(setMe).catch(()=>setMe({authenticated:false}));
+  useEffect(()=>{loadMe();},[]);
+  if(me===undefined) return null;
+  if(!me.authenticated) return <Auth onAuth={loadMe}/>;
+  const nav=[["dashboard","📊 Dashboard"],["campaign","🚀 New campaign"],["contacts","👥 Contacts"],["templates","🗂️ Templates"],["inbox","💬 Inbox"],["reports","📈 Reports"],["team","👤 Team"]];
+  if(me.user.superadmin) nav.push(["admin","🛡️ Admin"]);
+  const V={dashboard:Dashboard,campaign:Campaign,contacts:Contacts,templates:Templates,inbox:Inbox,reports:Reports,team:Team,admin:Admin,settings:Settings}[view];
+  const switchOrg=async id=>{await api("/api/auth/switch-org","POST",{org_id:id});loadMe();setView("dashboard");};
+  const initials=(me.user.name||me.user.email||"?").trim()[0].toUpperCase();
+  return <div style={{minHeight:"100vh",display:"flex",background:T.bg,color:T.text,fontFamily:"Inter,system-ui"}}>
+    <aside style={{width:220,borderRight:`1px solid ${T.line}`,padding:"20px 12px",flexShrink:0}}>
+      <div style={{padding:"0 8px 14px",display:"flex",alignItems:"center",gap:9}}>
+        <img src="/static/logo.png" alt="" width="30" height="30" style={{borderRadius:8}}/>
+        <div>
+          <div style={{fontSize:18,fontWeight:800}}>Zen<span style={{background:T.grad,WebkitBackgroundClip:"text",color:"transparent"}}>Reach</span></div>
+          <div style={{fontSize:10.5,color:T.dim,fontWeight:600}}>by NexZen</div>
+        </div>
+      </div>
+      {nav.map(([id,l])=><div key={id} onClick={()=>setView(id)} style={{padding:"9px 12px",borderRadius:9,cursor:"pointer",fontSize:13,fontWeight:600,marginBottom:2,background:view===id?"rgba(79,124,255,.14)":"transparent",color:view===id?T.text:T.dim,borderLeft:view===id?`3px solid ${T.accent}`:"3px solid transparent"}}>{l}</div>)}
+      <div style={{marginTop:18,padding:"0 8px",fontSize:11,color:T.dim}}>
+        <div style={{marginBottom:4}}>Workspace</div>
+        <select style={{...inp,fontSize:12,padding:"6px 8px"}} value={me.active_org||""} onChange={e=>switchOrg(e.target.value)}>{me.orgs.map(o=><option key={o.id} value={o.id}>{o.name} ({o.role})</option>)}</select>
+        <a href="/whatsapp" style={{color:T.dim,display:"block",marginTop:8}}>Quick demo →</a>
+      </div>
+    </aside>
+    <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
+      {/* top bar with profile icon */}
+      <header style={{display:"flex",justifyContent:"flex-end",alignItems:"center",padding:"12px 24px",borderBottom:`1px solid ${T.line}`,position:"relative"}}>
+        <div onClick={()=>setMenu(!menu)} title="Account" style={{width:34,height:34,borderRadius:"50%",background:T.grad,color:"#06101e",fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15}}>{initials}</div>
+        {menu && <div style={{position:"absolute",top:54,right:24,background:T.panel,border:`1px solid ${T.line}`,borderRadius:12,padding:8,minWidth:200,zIndex:20,boxShadow:"0 8px 30px rgba(0,0,0,.5)"}}>
+          <div style={{padding:"8px 10px",borderBottom:`1px solid ${T.line}`,marginBottom:4}}>
+            <div style={{fontSize:13,fontWeight:700}}>{me.user.name||"User"}</div>
+            <div style={{fontSize:11.5,color:T.dim}}>{me.user.email}</div>
+          </div>
+          <div style={menuItem} onClick={()=>{setView("settings");setMenu(false);}}>⚙️ Settings</div>
+          <div style={menuItem} onClick={()=>{setView("settings");setMenu(false);}}>💳 Billing</div>
+          <div style={{...menuItem,color:T.red}} onClick={async()=>{await api("/api/auth/logout","POST");loadMe();}}>↩ Log out</div>
+        </div>}
+      </header>
+      <main style={{flex:1,padding:"24px 28px",maxWidth:1050,overflowY:"auto"}}>{view==="settings"?<Settings me={me}/>:<V/>}</main>
+    </div>
+  </div>;
+}
+const menuItem={padding:"9px 10px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,color:T.text};
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>NexZen – Mailer</title>
+  <title>ZenReach Mail · NexZen</title>
+  <link rel="icon" type="image/png" href="/static/logo.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;700&display=swap" rel="stylesheet"/>
@@ -360,6 +361,15 @@
       <div class="col-label" id="col-info"></div>
       <div class="chips" id="chips"></div>
       <div class="sample-box" id="sample-box"></div>
+
+      <div style="margin-top:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div>
+          <label for="send-limit" style="margin-bottom:4px;">Send Limit <span style="font-weight:400;color:var(--mu);">(optional)</span></label>
+          <input type="number" id="send-limit" min="1" style="width:130px;" placeholder="All"/>
+          <p class="hint">Leave blank to send all. Enter a number to cap (e.g. 200 of 500).</p>
+        </div>
+        <div id="limit-badge" style="display:none;background:#eff6ff;border:1px solid #bedbff;border-radius:8px;padding:8px 14px;font-size:.8rem;color:#1447e6;margin-top:18px;"></div>
+      </div>
     </div>
   </div>
 
@@ -475,7 +485,15 @@
 
   <!-- ── Progress ──────────────────────────────────────────── -->
   <div class="card" id="progress-section">
-    <div class="card-head"><div class="step-num">📨</div><h2>Sending Progress</h2></div>
+    <div class="card-head" style="justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="step-num">📨</div><h2>Sending Progress</h2>
+      </div>
+      <button id="pause-btn" onclick="pauseSend()"
+        style="padding:8px 18px;background:#fff;border:1.5px solid #fb2c36;color:#fb2c36;border-radius:8px;font-weight:600;font-size:.82rem;cursor:pointer;font-family:'Inter',sans-serif;display:none;">
+        ⏸ Pause &amp; Download
+      </button>
+    </div>
     <p class="smsg" id="smsg">Connecting to mail server...</p>
     <div class="stats">
       <div class="sbox tot"><div class="num" id="s-tot">0</div><div class="lbl">Total</div></div>
@@ -485,8 +503,11 @@
     <div class="bar-wrap"><div class="bar-fill" id="bar-fill"></div></div>
     <div class="bar-pct" id="bar-pct">0%</div>
     <div class="done-banner" id="done-banner">✓ All done!</div>
+    <div id="pause-banner" style="display:none;background:#fff8e1;border:1px solid #f0d060;border-radius:8px;padding:12px 18px;color:#7d6608;font-weight:600;font-size:.88rem;margin-top:12px;">
+      ⏸ Paused — report below contains all emails sent so far.
+    </div>
     <a id="report-btn" href="#" target="_blank"
-       style="display:none;margin-top:12px;padding:10px 20px;background:var(--dark);color:#fff;font-weight:600;font-size:.85rem;border-radius:8px;text-decoration:none;display:none;font-family:'Inter',sans-serif;">
+       style="display:none;margin-top:12px;padding:10px 20px;background:var(--dark);color:#fff;font-weight:600;font-size:.85rem;border-radius:8px;text-decoration:none;font-family:'Inter',sans-serif;">
       📄 Download Report (Excel)
     </a>
     <div id="error-log">
@@ -520,15 +541,16 @@
 
 <script>
 const S = {
-  excelFile: null,
-  certFile:  null,
-  docsFiles: [],
-  columns:   [],
-  sample:    {},
-  total:     0,
-  attachType:'none',
-  pollTimer: null,
-  delay:     3
+  excelFile:    null,
+  certFile:     null,
+  docsFiles:    [],
+  columns:      [],
+  sample:       {},
+  total:        0,
+  attachType:   'none',
+  pollTimer:    null,
+  delay:        3,
+  currentJobId: null
 };
 
 function onPlanChange(radio) {
@@ -538,12 +560,30 @@ function onPlanChange(radio) {
   updateEta();
 }
 
+function getEffectiveTotal() {
+  const lim = parseInt(document.getElementById('send-limit')?.value);
+  return (lim && lim > 0 && lim < S.total) ? lim : S.total;
+}
+
+function onLimitChange() {
+  const lim   = parseInt(this.value);
+  const badge = document.getElementById('limit-badge');
+  if (lim && lim > 0 && lim <= S.total) {
+    badge.textContent = `Sending ${lim} of ${S.total} contacts`;
+    badge.style.display = 'block';
+  } else {
+    badge.style.display = 'none';
+  }
+  updateEta();
+}
+
 function updateEta() {
   if (!S.total) return;
-  const secs = Math.round(S.total * S.delay);
-  const mins = Math.floor(secs / 60), rem = secs % 60;
+  const count = getEffectiveTotal();
+  const secs  = Math.round(count * S.delay);
+  const mins  = Math.floor(secs / 60), rem = secs % 60;
   const timeStr = mins > 0 ? `~${mins}m ${rem}s` : `~${secs}s`;
-  document.getElementById('eta-total').textContent = S.total;
+  document.getElementById('eta-total').textContent = count;
   document.getElementById('eta-time').textContent  = timeStr;
   document.getElementById('eta-bar').style.display  = 'block';
 }
@@ -584,6 +624,9 @@ async function onExcel(file) {
     const d = await r.json();
     if (d.error) { alert('Excel error: ' + d.error); return; }
     S.columns = d.columns; S.sample = d.sample; S.total = d.total;
+    const limEl = document.getElementById('send-limit');
+    limEl.max = d.total;
+    limEl.addEventListener('input', onLimitChange);
     renderColumns();
     updateEta();
   } catch(e) { alert('Parse failed: ' + e.message); }
@@ -740,7 +783,7 @@ async function showEmailPreview() {
     const nameCol   = document.getElementById('name-col').value || S.columns[0];
     const firstName = S.sample[nameCol] || S.sample[S.columns[0]] || 'First student';
     document.getElementById('modal-sub').textContent = 'Previewing for: ' + firstName;
-    document.getElementById('send-count').textContent = S.total;
+    document.getElementById('send-count').textContent = getEffectiveTotal();
     document.getElementById('prev-modal').classList.add('open');
   } catch(e) { alert('Preview failed: ' + e.message); }
   finally { btn.textContent = '👁 Preview Email Before Sending'; btn.disabled = false; }
@@ -761,12 +804,14 @@ async function confirmSend() {
   closePreview();
 
   ['s-snt','s-fld'].forEach(id => document.getElementById(id).textContent = '0');
-  document.getElementById('s-tot').textContent     = S.total;
+  document.getElementById('s-tot').textContent     = getEffectiveTotal();
   document.getElementById('bar-fill').style.width  = '0%';
   document.getElementById('bar-pct').textContent   = '0%';
-  document.getElementById('done-banner').style.display  = 'none';
-  document.getElementById('report-btn').style.display   = 'none';
-  document.getElementById('error-log').style.display    = 'none';
+  document.getElementById('done-banner').style.display   = 'none';
+  document.getElementById('pause-banner').style.display  = 'none';
+  document.getElementById('pause-btn').style.display     = 'none';
+  document.getElementById('report-btn').style.display    = 'none';
+  document.getElementById('error-log').style.display     = 'none';
   document.getElementById('error-list').innerHTML       = '';
   document.getElementById('progress-section').style.display = 'block';
   document.getElementById('smsg').textContent = 'Connecting to mail server...';
@@ -790,6 +835,7 @@ async function confirmSend() {
   fd.append('smtp_server',   smtp.server);
   fd.append('smtp_port',     smtp.port);
   fd.append('delay',         S.delay);
+  fd.append('send_limit',    getEffectiveTotal());
 
   if (S.certFile && (S.attachType==='certificate'||S.attachType==='both'))
     fd.append('certificate', S.certFile);
@@ -804,7 +850,18 @@ async function confirmSend() {
   } catch(e) { alert('Network error: ' + e.message); cBtn.disabled = false; }
 }
 
+async function pauseSend() {
+  if (!S.currentJobId) return;
+  const btn = document.getElementById('pause-btn');
+  btn.textContent = 'Pausing...'; btn.disabled = true;
+  try {
+    await fetch('/pause/' + S.currentJobId, { method: 'POST' });
+  } catch(e) { console.error(e); }
+}
+
 function startPolling(jobId, total) {
+  S.currentJobId = jobId;
+  document.getElementById('pause-btn').style.display = 'block';
   if (S.pollTimer) clearInterval(S.pollTimer);
   S.pollTimer = setInterval(async () => {
     try {
@@ -821,7 +878,11 @@ function startPolling(jobId, total) {
       document.getElementById('s-fld').textContent    = fail;
       document.getElementById('bar-fill').style.width = pct + '%';
       document.getElementById('bar-pct').textContent  = pct + '%';
-      document.getElementById('smsg').textContent     = data.done ? 'Completed.' : `Sending… ${proc} of ${total}`;
+
+      const isPaused = data.paused;
+      document.getElementById('smsg').textContent = data.done
+        ? (isPaused ? 'Paused.' : 'Completed.')
+        : `Sending… ${proc} of ${total}`;
 
       if (data.errors && data.errors.length) {
         document.getElementById('error-log').style.display = 'block';
@@ -829,7 +890,12 @@ function startPolling(jobId, total) {
       }
       if (data.done) {
         clearInterval(S.pollTimer);
-        document.getElementById('done-banner').style.display = 'block';
+        document.getElementById('pause-btn').style.display = 'none';
+        if (isPaused) {
+          document.getElementById('pause-banner').style.display = 'block';
+        } else {
+          document.getElementById('done-banner').style.display = 'block';
+        }
         const rb = document.getElementById('report-btn');
         rb.href  = '/report/' + jobId;
         rb.style.display = 'inline-block';

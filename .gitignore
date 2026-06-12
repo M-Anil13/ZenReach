@@ -1,0 +1,22 @@
+# Secrets & runtime config
+.env
+.secret_key
+.flask_secret
+
+# Database & runtime artifacts
+nexzen.db
+nexzen.db-wal
+nexzen.db-shm
+exports/
+cookies.txt
+server.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.venv-1/
+
+# Editor
+.vscode/
+.tmp/
