@@ -17,6 +17,12 @@ from flask import g
 
 DB_PATH = os.environ.get("NEXZEN_DB", os.path.join(os.path.dirname(__file__), "..", "nexzen.db"))
 
+# Ensure the parent directory exists (e.g. /data on a mounted volume) so SQLite
+# can create the file instead of failing with "unable to open database file".
+_dbdir = os.path.dirname(os.path.abspath(DB_PATH))
+if _dbdir:
+    os.makedirs(_dbdir, exist_ok=True)
+
 
 def uid(prefix=""):
     return (prefix + uuid.uuid4().hex)[:32] if not prefix else prefix + "_" + uuid.uuid4().hex[:24]
