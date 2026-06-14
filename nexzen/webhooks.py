@@ -24,6 +24,8 @@ APP_SECRET = os.environ.get("NEXZEN_META_APP_SECRET", "")   # PRODUCTION: set th
 
 
 @bp.get("/webhooks/meta")
+@bp.get("/api/webhooks/whatsapp")
+@bp.get("/webhooks/whatsapp")
 def verify_challenge():
     if (request.args.get("hub.mode") == "subscribe"
             and request.args.get("hub.verify_token") == VERIFY_TOKEN):
@@ -32,6 +34,8 @@ def verify_challenge():
 
 
 @bp.post("/webhooks/meta")
+@bp.post("/api/webhooks/whatsapp")
+@bp.post("/webhooks/whatsapp")
 def receive():
     raw = request.get_data()
     if not sec.verify_meta_signature(APP_SECRET, raw, request.headers.get("X-Hub-Signature-256")):
