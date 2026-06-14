@@ -94,6 +94,32 @@ def require_role(min_role):
     return deco
 
 
+def org_feature(org_id, name):
+    """True if the org's plan unlocks feature `name` (master prompt §11)."""
+    import json
+    row = q1("""SELECT p.features FROM orgs o JOIN plans p ON p.id=o.plan_id WHERE o.id=?""", (org_id,))
+    if not row or not row["features"]:
+        return False
+    try:
+        return bool(json.loads(row["features"]).get(name, False))
+    except Exception:
+        return False
+
+
+def require_feature(name):
+    """Gate an endpoint on a plan feature; returns 402 with an upgrade hint."""
+    def deco(fn):
+        @functools.wraps(fn)
+        @require_org
+        def w(*a, **k):
+            if not org_feature(g.org["id"], name):
+                return jsonify({"error": f"'{name}' is not on your plan.",
+                                "upgrade": True, "feature": name}), 402
+            return fn(*a, **k)
+        return w
+    return deco
+
+
 def require_superadmin(fn):
     @functools.wraps(fn)
     def w(*a, **k):
@@ -141,6 +167,14 @@ def signup():
                            "role": "owner", "created_at": now()})
     insert("subscriptions", {"id": uid("sub"), "org_id": org_id, "plan_id": "starter",
                              "status": "active", "created_at": now()})
+    # Affiliate attribution (?ref= code captured at signup).
+    ref = (d.get("ref") or request.args.get("ref") or "").strip()
+    if ref:
+        try:
+            from .affiliates import attribute_signup
+            attribute_signup(ref, org_id)
+        except Exception:
+            pass
     session["uid"] = user_id
     session["org_id"] = org_id
     audit("org.created", org_id, org_name)

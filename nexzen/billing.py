@@ -55,6 +55,18 @@ def plans():
     return jsonify({"plans": q("SELECT * FROM plans ORDER BY price_inr")})
 
 
+@bp.get("/api/billing/features")
+def features():
+    """Plan→feature comparison matrix for the upgrade screen (§11)."""
+    import json
+    rows = q("SELECT id, name, features FROM plans ORDER BY price_inr")
+    keys = ["inbox", "automations", "sequences", "journeys", "chatbot",
+            "integrations", "white_label", "api_access"]
+    for r in rows:
+        r["features"] = json.loads(r["features"] or "{}")
+    return jsonify({"keys": keys, "plans": rows})
+
+
 @bp.get("/api/billing/usage")
 @require_org
 def usage():
@@ -66,9 +78,10 @@ def usage():
         r["cost_inr"] = round(r["cost_micros"] / 1_000_000, 2)
     seats = q1("SELECT COUNT(*) c FROM memberships WHERE org_id=?", (g.org["id"],))["c"]
     contacts = q1("SELECT COUNT(*) c FROM contacts WHERE org_id=?", (g.org["id"],))["c"]
+    gst = q1("SELECT gst_number FROM orgs WHERE id=?", (g.org["id"],))["gst_number"]
     return jsonify({"period": _period(), "messages_used": used, "messages_limit": limit,
                     "blocked": blocked, "warning": warn, "by_category": by_cat,
-                    "seats": seats, "contacts": contacts,
+                    "seats": seats, "contacts": contacts, "gst_number": gst or "",
                     "tip": "Classify reminders as Utility — Utility messages cost far less than Marketing."})
 
 

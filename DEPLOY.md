@@ -1,4 +1,4 @@
-# Deploying ZenReach on Railway
+# Deploying ReachFlow on Railway
 
 This app is a single always-on Flask process (gunicorn, **1 worker**) with
 background threads (campaign queue, scheduler, token-health, trial auto-suspend)
@@ -9,7 +9,7 @@ and a **SQLite** database. It must run on an always-on instance with a
 > threads and fight over the SQLite file. Concurrency comes from `--threads`.
 
 ## 1. Create the service
-1. Railway → **New Project → Deploy from GitHub repo** → pick `ZenReach`.
+1. Railway → **New Project → Deploy from GitHub repo** → pick `ReachFlow`.
 2. Railway auto-detects Python (Nixpacks) and uses `Procfile` / `railway.json`
    to start gunicorn. No build config needed.
 

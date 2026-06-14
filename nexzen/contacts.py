@@ -238,14 +238,14 @@ def add_suppression():
     return jsonify({"ok": True, "added": len(nums)})
 
 
-def suppress(org_id, phone, reason="stop"):
+def suppress(org_id, phone, reason="stop", conn=None):
     """Add a number to the do-not-contact list (idempotent)."""
-    ex("INSERT OR IGNORE INTO suppression VALUES (?,?,?,?)", (org_id, phone, reason, now()))
-    ex("UPDATE contacts SET opt_in=0 WHERE org_id=? AND phone=?", (org_id, phone))
+    ex("INSERT OR IGNORE INTO suppression VALUES (?,?,?,?)", (org_id, phone, reason, now()), conn=conn)
+    ex("UPDATE contacts SET opt_in=0 WHERE org_id=? AND phone=?", (org_id, phone), conn=conn)
 
 
-def is_suppressed(org_id, phone):
-    return q1("SELECT 1 FROM suppression WHERE org_id=? AND phone=?", (org_id, phone)) is not None
+def is_suppressed(org_id, phone, conn=None):
+    return q1("SELECT 1 FROM suppression WHERE org_id=? AND phone=?", (org_id, phone), conn=conn) is not None
 
 
 def is_stop_keyword(text):

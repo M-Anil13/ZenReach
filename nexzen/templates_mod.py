@@ -60,6 +60,16 @@ def create_template():
     if not name or not body:
         return jsonify({"error": "Template name and body are required."}), 400
 
+    # Meta requires a sample value for EVERY {{n}} variable at submission.
+    import re as _re
+    var_nums = sorted({int(n) for n in _re.findall(r"\{\{(\d+)\}\}", body)})
+    samples = (example[0] if example and isinstance(example, list) else example) or []
+    if var_nums:
+        if not samples or len(samples) < len(var_nums) or any(not str(s).strip() for s in samples[:len(var_nums)]):
+            return jsonify({"error": f"Provide a sample value for each variable "
+                                     f"({len(var_nums)} needed: {{{{{'}}, {{'.join(map(str, var_nums))}}}}}).",
+                            "need_samples": len(var_nums)}), 400
+
     tid = uid("tpl")
     insert("templates", {"id": tid, "org_id": g.org["id"], "name": name, "category": category,
                          "status": "DRAFT", "created_at": now(), "updated_at": now()})
@@ -68,14 +78,14 @@ def create_template():
                                  "header_kind": (header or {}).get("format"),
                                  "header_value": (header or {}).get("text"),
                                  "buttons_json": json.dumps(buttons) if buttons else None,
-                                 "example_json": json.dumps(example) if example else None})
+                                 "example_json": json.dumps(samples) if samples else None})
 
     client = get_client(g.org["id"])
     submitted = False
     meta_resp = None
     if client:
         ok, resp = client.create_template(name, category, language, body, header,
-                                           _meta_buttons(buttons), example[0] if example else None)
+                                           _meta_buttons(buttons), samples or None)
         submitted = ok
         meta_resp = resp
         update("templates", tid, {"status": "PENDING" if ok else "ERROR",

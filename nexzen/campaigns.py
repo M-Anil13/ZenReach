@@ -91,6 +91,10 @@ def create_campaign():
                          "scheduled_at": d.get("scheduled_at"), "local_time": 1 if d.get("local_time") else 0,
                          "throughput": int(d.get("throughput", 20)), "warmup": 1 if d.get("warmup") else 0,
                          "variant_a": template, "variant_b": d.get("variant_b"), "ab_metric": d.get("ab_metric"),
+                         "opt_auto_suppress": 1 if d.get("auto_suppress") else 0,
+                         "opt_auto_tag": 1 if d.get("auto_tag") else 0,
+                         "opt_report_email": (d.get("report_email") or "").strip() or None,
+                         "report_delay": int(d.get("report_delay", 0)),
                          "total": len(audience), "created_by": d.get("created_by", "ui"), "created_at": now()})
 
     # Build recipient rows now, applying suppression + frequency cap + dedup.
@@ -182,14 +186,14 @@ def _process_recipient(conn, camp, org, client, demo, r):
             if failed:
                 from .meta import explain
                 info = explain([131026, 130429, 132012][hash(phone) % 3])
-                _mark_failed(conn, r, info, attempt)
+                _mark_failed(conn, r, info, attempt, camp=camp)
             else:
-                _mark_sent(conn, r, "demo_" + uid(), attempt, delivered=True)
+                _mark_sent(conn, r, "demo_" + uid(), attempt, delivered=True, camp=camp)
             return
         ok, res = client.send_template(phone, camp["template_name"], camp["template_lang"],
                                        body_params=[name or "there", org["name"]])
         if ok:
-            _mark_sent(conn, r, res, attempt)
+            _mark_sent(conn, r, res, attempt, camp=camp)
             _meter(conn, camp["org_id"], camp["template_name"], phone)
             return
         from .meta import TRANSIENT
@@ -198,23 +202,42 @@ def _process_recipient(conn, camp, org, client, demo, r):
             backoff = (2 ** attempt) + random.uniform(0, 1)  # exponential + jitter
             time.sleep(min(backoff, 30))
             continue
-        _mark_failed(conn, r, res, attempt)   # permanent or out of retries (dead-letter)
+        _mark_failed(conn, r, res, attempt, camp=camp)   # permanent / dead-letter
         return
 
 
-def _mark_sent(conn, r, message_id, attempts, delivered=False):
+def _mark_sent(conn, r, message_id, attempts, delivered=False, camp=None):
     fields = {"status": "delivered" if delivered else "sent", "message_id": message_id,
               "attempts": attempts, "sent_at": now()}
     if delivered:
         fields["delivered_at"] = now()
     sets = ", ".join(f"{k}=?" for k in fields)
     ex(f"UPDATE campaign_recipients SET {sets} WHERE id=?", (*fields.values(), r["id"]), conn=conn)
+    if camp and camp["opt_auto_tag"]:
+        _tag(conn, camp["org_id"], r["contact_phone"], "delivered" if delivered else "sent")
 
 
-def _mark_failed(conn, r, info, attempts):
+def _mark_failed(conn, r, info, attempts, camp=None):
     ex("""UPDATE campaign_recipients SET status='failed', error_code=?, error_label=?,
           error_fix=?, attempts=? WHERE id=?""",
        (info.get("code"), info.get("label"), info.get("fix"), attempts, r["id"]), conn=conn)
+    if camp:
+        # Auto-unsubscribe permanently-failed contacts to keep lists clean (§7c).
+        from .meta import PERMANENT
+        if camp["opt_auto_suppress"] and info.get("code") in PERMANENT:
+            from .contacts import suppress
+            suppress(camp["org_id"], r["contact_phone"], "auto_suppress_failed")
+        if camp["opt_auto_tag"]:
+            _tag(conn, camp["org_id"], r["contact_phone"], "failed")
+
+
+def _tag(conn, org_id, phone, tag):
+    import json
+    c = q1("SELECT id, attrs FROM contacts WHERE org_id=? AND phone=?", (org_id, phone), conn=conn)
+    if c:
+        attrs = json.loads(c["attrs"] or "{}")
+        attrs["status_tag"] = tag
+        ex("UPDATE contacts SET attrs=? WHERE id=?", (json.dumps(attrs), c["id"]), conn=conn)
 
 
 def _meter(conn, org_id, template_name, phone):
@@ -236,6 +259,27 @@ def _finalize(conn, cid):
     # Outbound webhook: campaign.completed
     from .publicapi import fire_webhook
     fire_webhook(cid_org(conn, cid), "campaign.completed", {"campaign_id": cid})
+    # Optional emailed delivery-report summary after a delay (§7c).
+    camp = q1("SELECT * FROM campaigns WHERE id=?", (cid,), conn=conn)
+    if camp and camp["opt_report_email"]:
+        threading.Thread(target=_email_report, args=(cid, camp["opt_report_email"],
+                                                      int(camp["report_delay"] or 0)), daemon=True).start()
+
+
+def _email_report(cid, to, delay_secs):
+    if delay_secs > 0:
+        time.sleep(min(delay_secs, 3600))
+    conn = raw_conn()
+    try:
+        c = q1("SELECT * FROM campaigns WHERE id=?", (cid,), conn=conn)
+        from .mailer import send_email
+        from .auth import org_smtp
+        send_email(to, f"Campaign report: {c['name']}",
+                   f"<h3>{c['name']}</h3><p>Attempted {c['attempted']} · Sent {c['sent']} · "
+                   f"Delivered {c['delivered']} · Read {c['read']} · Failed {c['failed']} · "
+                   f"Skipped {c['skipped']}</p>", cfg=org_smtp(c["org_id"]))
+    finally:
+        conn.close()
 
 
 def cid_org(conn, cid):

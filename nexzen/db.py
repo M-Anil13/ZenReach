@@ -289,6 +289,65 @@ CREATE TABLE IF NOT EXISTS settings (
   org_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT,
   PRIMARY KEY(org_id, key)
 );
+
+-- ===== v2: lifecycle automation, capture, integrations, affiliates =========
+CREATE TABLE IF NOT EXISTS sequences (
+  id TEXT PRIMARY KEY, org_id TEXT NOT NULL, name TEXT, status TEXT DEFAULT 'active',
+  created_at INTEGER, FOREIGN KEY(org_id) REFERENCES orgs(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS sequence_steps (
+  id TEXT PRIMARY KEY, sequence_id TEXT NOT NULL, org_id TEXT NOT NULL, ord INTEGER,
+  delay_secs INTEGER DEFAULT 0, template_name TEXT, lang TEXT DEFAULT 'en_US',
+  exit_on TEXT,   -- replied|clicked|opted_out (branch/exit condition before this step)
+  FOREIGN KEY(sequence_id) REFERENCES sequences(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS sequence_enrollments (
+  id TEXT PRIMARY KEY, sequence_id TEXT NOT NULL, org_id TEXT NOT NULL,
+  contact_phone TEXT, contact_name TEXT, step_idx INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'active',   -- active|completed|exited|paused
+  next_run INTEGER, enrolled_at INTEGER,
+  UNIQUE(sequence_id, contact_phone),
+  FOREIGN KEY(sequence_id) REFERENCES sequences(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS journeys (
+  id TEXT PRIMARY KEY, org_id TEXT NOT NULL, name TEXT, status TEXT DEFAULT 'draft',
+  trigger_type TEXT, trigger_config TEXT, graph TEXT, created_at INTEGER,
+  FOREIGN KEY(org_id) REFERENCES orgs(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS journey_runs (
+  id TEXT PRIMARY KEY, journey_id TEXT NOT NULL, org_id TEXT NOT NULL,
+  contact_phone TEXT, node_id TEXT, status TEXT DEFAULT 'running',
+  log TEXT, next_run INTEGER, started_at INTEGER, updated_at INTEGER,
+  FOREIGN KEY(journey_id) REFERENCES journeys(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS integrations (
+  id TEXT PRIMARY KEY, org_id TEXT NOT NULL, kind TEXT, name TEXT,
+  token TEXT, config TEXT, enabled INTEGER DEFAULT 1, created_at INTEGER,
+  FOREIGN KEY(org_id) REFERENCES orgs(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS capture_forms (
+  id TEXT PRIMARY KEY, org_id TEXT NOT NULL, name TEXT, fields_json TEXT,
+  list_id TEXT, journey_id TEXT, sequence_id TEXT, source_tag TEXT, created_at INTEGER,
+  FOREIGN KEY(org_id) REFERENCES orgs(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS ad_leads (
+  id TEXT PRIMARY KEY, org_id TEXT NOT NULL, source TEXT, payload TEXT,
+  contact_phone TEXT, created_at INTEGER,
+  FOREIGN KEY(org_id) REFERENCES orgs(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS affiliates (
+  id TEXT PRIMARY KEY, user_id TEXT, code TEXT UNIQUE, commission_pct INTEGER DEFAULT 25,
+  paid_out_micros INTEGER DEFAULT 0, created_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS referrals (
+  id TEXT PRIMARY KEY, affiliate_id TEXT, referred_org TEXT, status TEXT DEFAULT 'signed_up',
+  amount_micros INTEGER DEFAULT 0, created_at INTEGER,
+  FOREIGN KEY(affiliate_id) REFERENCES affiliates(id) ON DELETE CASCADE
+);
 """
 
 # Restricted business categories (WhatsApp Commerce Policy) — onboarding screen.
@@ -319,6 +378,17 @@ PLAN_DESCRIPTIONS = {
 # because settings has no foreign key).
 PLATFORM = "_platform"
 
+# Feature-gating matrix per plan (master prompt §11). Centrally configurable;
+# enforced on API + UI. Locked features show an "upgrade to unlock" prompt.
+PLAN_FEATURES = {
+    "starter":    {"inbox": True, "automations": True, "sequences": False, "journeys": False,
+                   "chatbot": False, "integrations": False, "white_label": False, "api_access": False},
+    "growth":     {"inbox": True, "automations": True, "sequences": True, "journeys": True,
+                   "chatbot": False, "integrations": True, "white_label": False, "api_access": False},
+    "enterprise": {"inbox": True, "automations": True, "sequences": True, "journeys": True,
+                   "chatbot": True, "integrations": True, "white_label": True, "api_access": True},
+}
+
 
 def _add_col(c, table, col, decl):
     cols = [r[1] for r in c.execute(f"PRAGMA table_info({table})").fetchall()]
@@ -340,9 +410,23 @@ def init_db(conn=None):
     _add_col(c, "plans", "description", "TEXT")
     _add_col(c, "orgs", "trial_ends", "INTEGER")
     _add_col(c, "subscriptions", "paid", "INTEGER DEFAULT 0")
+    # v2 deltas
+    _add_col(c, "orgs", "gst_number", "TEXT")
+    _add_col(c, "orgs", "prereqs_ack", "INTEGER DEFAULT 0")
+    _add_col(c, "contacts", "source", "TEXT")
+    _add_col(c, "campaigns", "opt_auto_suppress", "INTEGER DEFAULT 0")
+    _add_col(c, "campaigns", "opt_auto_tag", "INTEGER DEFAULT 0")
+    _add_col(c, "campaigns", "opt_report_email", "TEXT")
+    _add_col(c, "campaigns", "report_delay", "INTEGER DEFAULT 0")
+    _add_col(c, "automations", "match_mode", "TEXT DEFAULT 'phrase'")
+    _add_col(c, "plans", "features", "TEXT")   # JSON feature flags
     for pid, desc in PLAN_DESCRIPTIONS.items():
         c.execute("UPDATE plans SET description=? WHERE id=? AND (description IS NULL OR description='')",
                   (desc, pid))
+    import json as _json
+    for pid, feats in PLAN_FEATURES.items():
+        c.execute("UPDATE plans SET features=? WHERE id=? AND (features IS NULL OR features='')",
+                  (_json.dumps(feats), pid))
     # default platform trial config
     c.execute("INSERT OR IGNORE INTO settings (org_id, key, value) VALUES (?,?,?)",
               (PLATFORM, "trial", '{"trial_days": 14, "grace_days": 3}'))

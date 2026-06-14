@@ -128,6 +128,14 @@ def mark_paid(oid):
     sub = q1("SELECT id FROM subscriptions WHERE org_id=? ORDER BY created_at DESC LIMIT 1", (oid,))
     if sub:
         ex("UPDATE subscriptions SET paid=? WHERE id=?", (paid, sub["id"]))
+    if paid:
+        # Accrue affiliate commission on the plan's price.
+        price = q1("""SELECT p.price_inr FROM orgs o JOIN plans p ON p.id=o.plan_id WHERE o.id=?""", (oid,))
+        try:
+            from .affiliates import record_commission
+            record_commission(oid, int((price or {}).get("price_inr", 0)) * 1_000_000)
+        except Exception:
+            pass
     audit("admin.mark_paid", oid, str(bool(paid)))
     return jsonify({"ok": True})
 

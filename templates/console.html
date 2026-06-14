@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ZenReach by NexZen · Console</title>
+<title>ReachFlow by NexZen · Console</title>
 <link rel="icon" type="image/png" href="/static/logo.png" />
 <style>
   html,body{margin:0;background:#070A12}
@@ -94,19 +94,75 @@ function Auth({ onAuth }) {
   </div>;
 }
 
+/* ===================== ONBOARDING PREREQS ===================== */
+function Prereqs({onDone}){
+  const [p,setP]=useState(null);const [gst,setGst]=useState("");const [chk,setChk]=useState({});const [err,setErr]=useState("");
+  useEffect(()=>{api("/api/onboarding/prereqs").then(d=>{setP(d);setGst(d.gst_number||"");});},[]);
+  if(!p) return null;
+  if(p.acknowledged){ if(onDone)onDone(); return null; }
+  const allChecked=p.items.every(i=>chk[i.key]);
+  const ack=async()=>{try{await api("/api/onboarding/prereqs","POST",{gst_number:gst});onDone&&onDone();location.reload();}catch(e){setErr(e.message);}};
+  return <div style={{...card,borderColor:T.amber}}>
+    <div style={{fontWeight:700,marginBottom:8}}>Before you connect — prerequisites</div>
+    {p.items.map(i=><label key={i.key} style={{display:"block",fontSize:13,marginBottom:8,color:T.text}}>
+      <input type="checkbox" checked={!!chk[i.key]} onChange={e=>setChk({...chk,[i.key]:e.target.checked})}/> {i.label}</label>)}
+    <div style={{color:T.dim,fontSize:12,margin:"4px 0 6px"}}>GST number (mandatory for Indian businesses)</div>
+    <input style={inp} placeholder="e.g. 22AAAAA0000A1Z5" value={gst} onChange={e=>setGst(e.target.value)}/>
+    {err && <div style={{color:T.red,fontSize:12.5,marginBottom:8}}>{err}</div>}
+    <Btn primary disabled={!allChecked||!gst} onClick={ack} style={{opacity:(allChecked&&gst)?1:.5}}>Acknowledge & continue</Btn>
+  </div>;
+}
+
 /* ===================== CREDENTIALS ===================== */
 function Credentials() {
   const [c,setC]=useState({token:"",phone_id:"",waba_id:""});
   const [state,setState]=useState(null);
   const [cur,setCur]=useState(null);
-  useEffect(()=>{api("/api/credentials").then(setCur).catch(()=>{});},[]);
+  const [es,setEs]=useState(null);          // embedded-signup config
+  const [ready,setReady]=useState(false);   // prereqs acknowledged
+  const esData=useRef({phone_number_id:"",waba_id:""});
+  const reload=()=>api("/api/credentials").then(setCur).catch(()=>{});
+  useEffect(()=>{reload();api("/api/credentials/embedded/config").then(setEs).catch(()=>{});},[]);
+
   const verify=async()=>{ setState("busy");
-    try{ const r=await api("/api/credentials/verify","POST",c); setState(r); api("/api/credentials").then(setCur); }
+    try{ const r=await api("/api/credentials/verify","POST",c); setState(r); reload(); }
     catch(e){ setState({ok:false,error:e.message}); }
   };
+
+  const launchEmbedded=()=>{
+    // capture phone_number_id + waba_id from Meta's popup event
+    window.addEventListener("message",(ev)=>{
+      try{ const d=JSON.parse(ev.data); if(d.type==="WA_EMBEDDED_SIGNUP" && d.data){ esData.current={phone_number_id:d.data.phone_number_id,waba_id:d.data.waba_id}; } }catch(_){}
+    });
+    const start=()=>window.FB.login(async (resp)=>{
+      const code=resp.authResponse&&resp.authResponse.code;
+      if(!code){ setState({ok:false,error:"Signup cancelled."}); return; }
+      setState("busy");
+      try{ const r=await api("/api/credentials/embedded/exchange","POST",{code,...esData.current}); setState(r); reload(); }
+      catch(e){ setState({ok:false,error:e.message}); }
+    },{config_id:es.config_id,response_type:"code",override_default_response_type:true,extras:{setup:{}}});
+    if(window.FB){ start(); return; }
+    // load FB SDK once
+    window.fbAsyncInit=function(){ window.FB.init({appId:es.app_id,version:es.graph_version,cookie:true,xfbml:false}); start(); };
+    const s=document.createElement("script"); s.src="https://connect.facebook.net/en_US/sdk.js"; s.async=true; document.body.appendChild(s);
+  };
+
   return <div><H1>API settings</H1>
     {cur && cur.connected && <div style={{...card,color:T.green,background:"#0d2a1f"}}>✅ Connected: <b>{cur.verified_name}</b> ({cur.display_number}) · health {cur.health}</div>}
+    {!ready && <Prereqs onDone={()=>setReady(true)}/>}
+
+    {/* PRIMARY: Embedded Signup */}
     <div style={card}>
+      <div style={{fontWeight:700,marginBottom:6}}>Connect WhatsApp</div>
+      {es && es.enabled
+        ? <div><div style={{fontSize:12.5,color:T.dim,marginBottom:10}}>Create or connect your WhatsApp Business Account in one popup — no developer portal, no copying tokens.</div>
+            <Btn primary onClick={launchEmbedded}>🟢 Connect with Facebook</Btn></div>
+        : <div style={{fontSize:12.5,color:T.dim}}>⏳ Embedded Signup activates once NexZen's Meta App Review + Tech-Provider setup is complete. Until then, use manual entry below.</div>}
+    </div>
+
+    {/* FALLBACK: manual entry */}
+    <div style={card}>
+      <div style={{fontWeight:700,marginBottom:8}}>Manual credentials <span style={{fontSize:11,color:T.dim,fontWeight:400}}>(fallback / existing WABA)</span></div>
       <div style={{color:T.dim,fontSize:12,marginBottom:6}}>Permanent Access Token</div>
       <input style={inp} type="password" placeholder="EAAG…" value={c.token} onChange={e=>setC({...c,token:e.target.value})}/>
       <div style={{color:T.dim,fontSize:12,marginBottom:6}}>Phone Number ID</div>
@@ -114,7 +170,7 @@ function Credentials() {
       <div style={{color:T.dim,fontSize:12,marginBottom:6}}>WABA ID</div>
       <input style={inp} value={c.waba_id} onChange={e=>setC({...c,waba_id:e.target.value})}/>
       <Btn primary onClick={verify} disabled={state==="busy"}>{state==="busy"?"Verifying…":"Save & verify"}</Btn>
-      {state && state!=="busy" && <div style={{marginTop:12,fontSize:13,color:state.ok?T.green:T.red}}>{state.ok?`✅ ${state.name} · tier ${state.tier} · quality ${state.quality}`:`❌ ${state.error}${state.fix?" — "+state.fix:""}`}</div>}
+      {state && state!=="busy" && <div style={{marginTop:12,fontSize:13,color:state.ok?T.green:T.red}}>{state.ok?`✅ ${state.name||"Connected"}${state.tier?` · tier ${state.tier}`:""}`:`❌ ${state.error}${state.fix?" — "+state.fix:""}`}</div>}
       <div style={{fontSize:11.5,color:T.dim,marginTop:12}}>🔒 Token stored AES-256-GCM encrypted server-side; never returned to the browser.</div>
     </div>
   </div>;
@@ -446,6 +502,89 @@ function AdminSubs() {
 const ip={width:"100%",boxSizing:"border-box",background:T.bg,color:T.text,border:`1px solid ${T.line}`,borderRadius:8,padding:"7px 9px",fontSize:12.5,marginBottom:8};
 const Lbl=({l,children})=><label style={{display:"block",fontSize:11.5,color:T.dim,marginBottom:2}}>{l}{children}</label>;
 
+/* ===================== GROWTH: SEQUENCES / JOURNEYS / CAPTURE / INTEGRATIONS ===================== */
+function Upgrade({feature}){return <div style={{...card,borderColor:T.amber}}><b>🔒 {feature}</b> is not on your plan. <a href="#" onClick={e=>{e.preventDefault();}} style={{color:T.accent2}}>Upgrade</a> in Settings → Billing to unlock.</div>;}
+
+function Sequences(){
+  const [list,setList]=useState([]);const [gated,setGated]=useState(false);
+  const [f,setF]=useState({name:"",steps:[{template:"",delay_secs:0,exit_on:""}]});
+  const load=()=>api("/api/sequences").then(d=>setList(d.sequences)).catch(()=>{});
+  useEffect(()=>{load();},[]);
+  const addStep=()=>setF({...f,steps:[...f.steps,{template:"",delay_secs:86400,exit_on:""}]});
+  const create=async()=>{try{await api("/api/sequences","POST",f);setF({name:"",steps:[{template:"",delay_secs:0,exit_on:""}]});load();}catch(e){if(e.message.includes("plan"))setGated(true);else alert(e.message);}};
+  if(gated) return <div><H1>Drip sequences</H1><Upgrade feature="Sequences"/></div>;
+  return <div><H1>Drip sequences</H1>
+    <div style={card}><input style={inp} placeholder="Sequence name" value={f.name} onChange={e=>setF({...f,name:e.target.value})}/>
+      {f.steps.map((s,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:6}}>
+        <input style={{...inp,marginBottom:0}} placeholder="template name" value={s.template} onChange={e=>{const st=[...f.steps];st[i].template=e.target.value;setF({...f,steps:st});}}/>
+        <input style={{...inp,width:120,marginBottom:0}} type="number" placeholder="delay s" value={s.delay_secs} onChange={e=>{const st=[...f.steps];st[i].delay_secs=+e.target.value;setF({...f,steps:st});}}/>
+        <select style={{...inp,width:130,marginBottom:0}} value={s.exit_on} onChange={e=>{const st=[...f.steps];st[i].exit_on=e.target.value;setF({...f,steps:st});}}><option value="">no exit</option><option value="replied">exit if replied</option><option value="clicked">exit if clicked</option><option value="opted_out">exit if opted-out</option></select>
+      </div>)}
+      <Btn onClick={addStep}>+ step</Btn> <Btn primary onClick={create}>Create</Btn>
+    </div>
+    {list.map(s=><div key={s.id} style={card}><b>{s.name}</b> <Badge tone={s.status==="active"?"ok":"warn"}>{s.status}</Badge> <span style={{color:T.dim,fontSize:12}}>· {s.steps.length} steps · {s.enrolled} enrolled</span></div>)}
+  </div>;
+}
+function Journeys(){
+  const [list,setList]=useState([]);const [gated,setGated]=useState(false);const [triggers,setTriggers]=useState([]);
+  const [f,setF]=useState({name:"",trigger_type:"form_submitted",status:"active",graph:'{"entry":"n1","nodes":{"n1":{"type":"action","action":"add_tag","config":{"tag":"lead"},"next":"n2"},"n2":{"type":"wait","secs":86400,"next":"n3"},"n3":{"type":"action","action":"send_template","config":{"template":"welcome","lang":"en_US"},"next":null}}}'});
+  const load=()=>api("/api/journeys").then(d=>{setList(d.journeys);setTriggers(d.triggers);}).catch(()=>{});
+  useEffect(()=>{load();},[]);
+  const create=async()=>{try{await api("/api/journeys","POST",{...f,graph:JSON.parse(f.graph)});load();}catch(e){if(e.message.includes("plan"))setGated(true);else alert(e.message);}};
+  if(gated) return <div><H1>Journeys</H1><Upgrade feature="Journeys"/></div>;
+  return <div><H1>Automation journeys</H1>
+    <div style={{fontSize:12.5,color:T.dim,marginBottom:10}}>Trigger → conditions → actions. Visual drag-drop canvas coming soon; define the node graph as JSON for now.</div>
+    <div style={card}><input style={inp} placeholder="Journey name" value={f.name} onChange={e=>setF({...f,name:e.target.value})}/>
+      <select style={inp} value={f.trigger_type} onChange={e=>setF({...f,trigger_type:e.target.value})}>{triggers.map(t=><option key={t}>{t}</option>)}</select>
+      <textarea style={{...inp,height:120,fontFamily:"monospace",fontSize:12}} value={f.graph} onChange={e=>setF({...f,graph:e.target.value})}/>
+      <Btn primary onClick={create}>Create journey</Btn>
+    </div>
+    {list.map(j=><div key={j.id} style={card}><b>{j.name}</b> <Badge tone={j.status==="active"?"ok":"warn"}>{j.status}</Badge> <span style={{color:T.dim,fontSize:12}}>· trigger {j.trigger_type} · {j.runs} runs</span></div>)}
+  </div>;
+}
+function Capture(){
+  const [forms,setForms]=useState([]);const [f,setF]=useState({name:"",source_tag:"website"});
+  const load=()=>api("/api/capture/forms").then(d=>setForms(d.forms)).catch(()=>{});
+  useEffect(()=>{load();},[]);
+  const create=async()=>{const r=await api("/api/capture/forms","POST",{...f,fields:["name","phone"]});alert("Embed URL: "+r.embed+"\nWidget: "+r.widget);load();};
+  return <div><H1>Lead capture</H1>
+    <div style={card}><input style={inp} placeholder="Form name" value={f.name} onChange={e=>setF({...f,name:e.target.value})}/>
+      <input style={inp} placeholder="source tag" value={f.source_tag} onChange={e=>setF({...f,source_tag:e.target.value})}/>
+      <Btn primary onClick={create}>Create form + widget</Btn>
+      <div style={{fontSize:12,color:T.dim,marginTop:8}}>Each form gives a public submit URL + an embeddable floating WhatsApp widget for your website.</div>
+    </div>
+    {forms.map(x=><div key={x.id} style={card}><b>{x.name}</b> <span style={{color:T.dim,fontSize:12}}>· /capture/{x.id} · source {x.source_tag}</span></div>)}
+  </div>;
+}
+function Integrations(){
+  const [list,setList]=useState([]);const [gated,setGated]=useState(false);const [kinds,setKinds]=useState([]);const [k,setK]=useState("webhook");
+  const load=()=>api("/api/integrations").then(d=>{setList(d.integrations);setKinds(d.kinds);}).catch(()=>{});
+  useEffect(()=>{load();},[]);
+  const create=async()=>{try{const r=await api("/api/integrations","POST",{kind:k,name:k});alert("Inbound URL (paste in Zapier/Make/Woo/Sheets):\n"+r.inbound_url);load();}catch(e){if(e.message.includes("plan"))setGated(true);else alert(e.message);}};
+  if(gated) return <div><H1>Integrations</H1><Upgrade feature="Integrations"/></div>;
+  return <div><H1>Integrations</H1>
+    <div style={{fontSize:12.5,color:T.dim,marginBottom:10}}>Connect Zapier, Make, Pabbly, Google Sheets, WooCommerce, Shopify and CTWA ad leads via incoming webhooks. Each gives a unique inbound URL.</div>
+    <div style={card}><select style={inp} value={k} onChange={e=>setK(e.target.value)}>{kinds.map(x=><option key={x}>{x}</option>)}</select><Btn primary onClick={create}>Create connection</Btn></div>
+    {list.map(x=><div key={x.id} style={card}><b>{x.name}</b> <Badge tone="info">{x.kind}</Badge><div style={{fontSize:11,color:T.dim,fontFamily:"monospace",marginTop:4,wordBreak:"break-all"}}>{x.inbound_url}</div></div>)}
+  </div>;
+}
+function Affiliate(){
+  const [d,setD]=useState(null);
+  const load=()=>api("/api/affiliate/dashboard").then(setD).catch(()=>{});
+  useEffect(()=>{load();},[]);
+  const join=async()=>{await api("/api/affiliate/join","POST",{});load();};
+  if(!d) return <div><H1>Affiliate</H1><div style={{color:T.dim}}>Loading…</div></div>;
+  if(!d.joined) return <div><H1>Affiliate program</H1><div style={card}>Earn {25}% recurring commission for every org you refer.<div style={{marginTop:10}}><Btn primary onClick={join}>Join program</Btn></div></div></div>;
+  return <div><H1>Affiliate program</H1>
+    <div style={card}>Your link:<div style={{fontFamily:"monospace",fontSize:12,color:T.accent2,marginTop:4,wordBreak:"break-all"}}>{d.referral_link}</div></div>
+    <div style={{display:"flex",gap:10}}>
+      <div style={{...card,flex:1}}><Stat v={d.signups} l="signups"/></div>
+      <div style={{...card,flex:1}}><Stat v={d.paying} l="paying" c={T.green}/></div>
+      <div style={{...card,flex:1}}><Stat v={"₹"+d.earned_inr} l="earned" c={T.accent2}/></div>
+    </div>
+  </div>;
+}
+
 /* ===================== PROFILE & SETTINGS ===================== */
 function Profile({me,reload}) {
   const [name,setName]=useState(me.user.name||"");
@@ -519,9 +658,9 @@ function App() {
   useEffect(()=>{loadMe();},[]);
   if(me===undefined) return null;
   if(!me.authenticated) return <Auth onAuth={loadMe}/>;
-  const nav=[["dashboard","📊 Dashboard"],["campaign","🚀 New campaign"],["contacts","👥 Contacts"],["templates","🗂️ Templates"],["inbox","💬 Inbox"],["reports","📈 Reports"],["team","👤 Team"]];
+  const nav=[["dashboard","📊 Dashboard"],["campaign","🚀 New campaign"],["contacts","👥 Contacts"],["templates","🗂️ Templates"],["sequences","💧 Sequences"],["journeys","🧭 Journeys"],["capture","🎣 Lead capture"],["integrations","🔗 Integrations"],["inbox","💬 Inbox"],["reports","📈 Reports"],["team","👤 Team"]];
   if(me.user.superadmin) nav.push(["admin","🛡️ Admin"]);
-  const V={dashboard:Dashboard,campaign:Campaign,contacts:Contacts,templates:Templates,inbox:Inbox,reports:Reports,team:Team,admin:Admin,settings:Settings}[view];
+  const V={dashboard:Dashboard,campaign:Campaign,contacts:Contacts,templates:Templates,sequences:Sequences,journeys:Journeys,capture:Capture,integrations:Integrations,inbox:Inbox,reports:Reports,team:Team,admin:Admin,settings:Settings,affiliate:Affiliate}[view];
   const switchOrg=async id=>{await api("/api/auth/switch-org","POST",{org_id:id});loadMe();setView("dashboard");};
   const initials=(me.user.name||me.user.email||"?").trim()[0].toUpperCase();
   return <div style={{minHeight:"100vh",display:"flex",background:T.bg,color:T.text,fontFamily:"Inter,system-ui"}}>
@@ -551,6 +690,7 @@ function App() {
           </div>
           <div style={menuItem} onClick={()=>{setView("settings");setMenu(false);}}>⚙️ Settings</div>
           <div style={menuItem} onClick={()=>{setView("settings");setMenu(false);}}>💳 Billing</div>
+          <div style={menuItem} onClick={()=>{setView("affiliate");setMenu(false);}}>🤝 Affiliate</div>
           <div style={{...menuItem,color:T.red}} onClick={async()=>{await api("/api/auth/logout","POST");loadMe();}}>↩ Log out</div>
         </div>}
       </header>

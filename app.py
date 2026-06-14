@@ -55,9 +55,15 @@ from nexzen.billing import bp as billing_bp
 from nexzen.publicapi import bp as publicapi_bp
 from nexzen.ai import bp as ai_bp
 from nexzen.admin import bp as admin_bp
+from nexzen.sequences import bp as sequences_bp
+from nexzen.journeys import bp as journeys_bp
+from nexzen.capture import bp as capture_bp
+from nexzen.integrations import bp as integrations_bp
+from nexzen.affiliates import bp as affiliates_bp
 
 for _bp in (auth_bp, contacts_bp, credentials_bp, templates_bp, campaigns_bp, webhooks_bp,
-            inbox_bp, reports_bp, billing_bp, publicapi_bp, ai_bp, admin_bp):
+            inbox_bp, reports_bp, billing_bp, publicapi_bp, ai_bp, admin_bp,
+            sequences_bp, journeys_bp, capture_bp, integrations_bp, affiliates_bp):
     app.register_blueprint(_bp)
 
 app.teardown_appcontext(nxdb.close_db)
@@ -77,6 +83,10 @@ def _start_background():
     start_health_monitor()
     from nexzen.admin import start_trial_enforcer
     start_trial_enforcer()
+    from nexzen.sequences import start_worker as start_seq_worker
+    from nexzen.journeys import start_worker as start_jny_worker
+    start_seq_worker()
+    start_jny_worker()
 
 
 _FONT_PATHS = [

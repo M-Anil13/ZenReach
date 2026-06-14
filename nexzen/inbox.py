@@ -42,10 +42,13 @@ def ingest_inbound(conn, org_id, phone, text, message_id):
         _auto_send(conn, org_id, phone, "You've been unsubscribed. Reply START to opt back in.")
         return
 
-    # Keyword automations
+    # Keyword automations — exact or phrase match, multiple keywords per trigger.
     kw = (text or "").strip().lower()
     for a in q("SELECT * FROM automations WHERE org_id=? AND enabled=1", (org_id,), conn=conn):
-        if a["keyword"].lower() in kw:
+        mode = (a["match_mode"] or "phrase")
+        keys = [k.strip().lower() for k in (a["keyword"] or "").split(",") if k.strip()]
+        hit = any(k == kw for k in keys) if mode == "exact" else any(k in kw for k in keys)
+        if hit:
             if a["reply"]:
                 _auto_send(conn, org_id, phone, a["reply"])
             if a["tag"]:
@@ -146,10 +149,22 @@ def list_automations():
 def create_automation():
     d = request.get_json(force=True) or {}
     aid = uid("aut")
+    mode = "exact" if d.get("match_mode") == "exact" else "phrase"
     insert("automations", {"id": aid, "org_id": g.org["id"], "keyword": d.get("keyword", ""),
-                           "reply": d.get("reply", ""), "tag": d.get("tag"), "enabled": 1})
+                           "reply": d.get("reply", ""), "tag": d.get("tag"),
+                           "match_mode": mode, "enabled": 1})
     audit("automation.created", d.get("keyword", ""))
     return jsonify({"ok": True, "id": aid})
+
+
+@bp.post("/api/automations/<aid>/toggle")
+@require_role("agent")
+def toggle_automation(aid):
+    a = q1("SELECT enabled FROM automations WHERE id=? AND org_id=?", (aid, g.org["id"]))
+    if not a:
+        return jsonify({"error": "Not found"}), 404
+    ex("UPDATE automations SET enabled=? WHERE id=?", (0 if a["enabled"] else 1, aid))
+    return jsonify({"ok": True, "enabled": not a["enabled"]})
 
 
 # ---- click-to-WhatsApp + QR target ------------------------------------------
